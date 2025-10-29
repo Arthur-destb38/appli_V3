@@ -1,0 +1,19 @@
+{
+  "name": "gorillax-v2",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "dev:app": "pnpm --dir app start",
+    "dev:api": "pnpm --dir api exec uv run uvicorn api.main:app --reload",
+    "dev": "concurrently -k -n app,api \"pnpm run dev:app\" \"pnpm run dev:api\"",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "packageManager": "pnpm@10.19.0",
+  "devDependencies": {
+    "concurrently": "^9.2.1"
+  }
+}

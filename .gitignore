@@ -1,0 +1,19 @@
+# Node
+node_modules/
+app/.expo/
+app/dist/
+app/.next/
+
+# Python
+api/.venv/
+api/__pycache__/
+api/**/*.pyc
+
+# Env/config
+.env
+.env.*
+
+# OS/Editor
+.DS_Store
+.vscode/
+.idea/
