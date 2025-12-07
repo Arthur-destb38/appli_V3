@@ -187,6 +187,52 @@ export const WorkoutsProvider = ({ children }: PropsWithChildren) => {
           }
           break;
         }
+        case 'workout-upsert': {
+          const payload = event.payload as {
+            server_id: number;
+            client_id: string | null;
+            title: string;
+            status: 'draft' | 'completed';
+            created_at: string;
+            updated_at: string;
+            deleted_at: string | null;
+          };
+          if (payload.server_id && payload.client_id) {
+            try {
+              // Mettre à jour le server_id si nécessaire
+              await setWorkoutServerId(payload.client_id, payload.server_id);
+              // Trouver le workout local par server_id ou client_id
+              const localWorkouts = await fetchWorkouts();
+              const workout = localWorkouts.find(
+                (w) => w.workout.server_id === payload.server_id || w.workout.client_id === payload.client_id
+              );
+              if (workout) {
+                // Mettre à jour le titre et le statut si nécessaire
+                if (workout.workout.title !== payload.title) {
+                  await updateWorkoutTitle(workout.workout.id, payload.title);
+                }
+                if (workout.workout.status !== payload.status) {
+                  await updateWorkoutStatus(workout.workout.id, payload.status);
+                }
+              } else {
+                // Créer le workout s'il n'existe pas localement
+                await createWorkout(payload.title);
+                // Mettre à jour le server_id après création
+                const newWorkouts = await fetchWorkouts();
+                const newWorkout = newWorkouts.find((w) => w.workout.client_id === payload.client_id);
+                if (newWorkout) {
+                  await setWorkoutServerId(payload.client_id, payload.server_id);
+                  if (newWorkout.workout.status !== payload.status) {
+                    await updateWorkoutStatus(newWorkout.workout.id, payload.status);
+                  }
+                }
+              }
+            } catch (error) {
+              console.warn('Failed to apply workout-upsert', error);
+            }
+          }
+          break;
+        }
         default:
           console.warn('Unhandled sync event action', event.action);
       }
