@@ -27,6 +27,11 @@ import { AppCard } from '@/components/AppCard';
 export default function HomeScreen() {
   const router = useRouter();
   const { isAuthenticated, isLoading: authLoading } = useAuth();
+  const { workouts, isLoading, refresh, createDraft, deleteWorkout } = useWorkouts();
+  const { theme } = useAppTheme();
+  const [menuOpen, setMenuOpen] = useState(false);
+  const drawerAnim = useRef(new Animated.Value(0)).current;
+  const insets = useSafeAreaInsets();
 
   useEffect(() => {
     if (!authLoading && !isAuthenticated) {
@@ -45,11 +50,6 @@ export default function HomeScreen() {
   if (!isAuthenticated) {
     return null;
   }
-  const { workouts, isLoading, refresh, createDraft, deleteWorkout } = useWorkouts();
-  const { theme } = useAppTheme();
-  const [menuOpen, setMenuOpen] = useState(false);
-  const drawerAnim = useRef(new Animated.Value(0)).current;
-  const insets = useSafeAreaInsets();
 
   const handleCreate = async () => {
     const draft = await createDraft();
