@@ -63,7 +63,6 @@ export const AuthProvider: React.FC<PropsWithChildren> = ({ children }) => {
       setUser(null);
     } finally {
       setIsLoading(false);
-      console.log('Auth loading complete - isAuthenticated:', !!user);
     }
   }, []);
 
