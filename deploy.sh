@@ -123,6 +123,128 @@ check_command() {
     fi
 }
 
+# ============================================
+# INSTALLATION AUTOMATIQUE DE NODE.JS
+# ============================================
+
+install_node() {
+    log_info "Détection de la méthode d'installation pour $OS..."
+    
+    case "$OS" in
+        Mac)
+            # Essayer Homebrew d'abord
+            if check_command brew; then
+                log_info "Installation via Homebrew..."
+                brew install node@20
+                brew link node@20 --force --overwrite 2>/dev/null || true
+                # Ajouter au PATH pour cette session
+                export PATH="/opt/homebrew/opt/node@20/bin:$PATH"
+                export PATH="/usr/local/opt/node@20/bin:$PATH"
+            else
+                # Installer via le script officiel (fnm ou nvm)
+                log_info "Homebrew non trouvé, installation via fnm..."
+                curl -fsSL https://fnm.vercel.app/install | bash -s -- --skip-shell
+                export PATH="$HOME/.local/share/fnm:$PATH"
+                eval "$(fnm env 2>/dev/null)" || true
+                fnm install 20 2>/dev/null && fnm use 20 2>/dev/null
+            fi
+            ;;
+        Linux)
+            # Essayer plusieurs méthodes
+            if check_command apt-get; then
+                # Debian/Ubuntu - utiliser NodeSource
+                log_info "Installation via NodeSource (apt)..."
+                curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash - 2>/dev/null
+                sudo apt-get install -y nodejs 2>/dev/null
+            elif check_command dnf; then
+                # Fedora/RHEL
+                log_info "Installation via dnf..."
+                sudo dnf install -y nodejs 2>/dev/null
+            elif check_command pacman; then
+                # Arch Linux
+                log_info "Installation via pacman..."
+                sudo pacman -S --noconfirm nodejs npm 2>/dev/null
+            else
+                # Fallback: fnm
+                log_info "Installation via fnm..."
+                curl -fsSL https://fnm.vercel.app/install | bash -s -- --skip-shell
+                export PATH="$HOME/.local/share/fnm:$PATH"
+                eval "$(fnm env 2>/dev/null)" || true
+                fnm install 20 2>/dev/null && fnm use 20 2>/dev/null
+            fi
+            ;;
+        Windows)
+            # Sur Windows (Git Bash/MSYS), utiliser fnm ou chocolatey
+            if check_command choco; then
+                log_info "Installation via Chocolatey..."
+                choco install nodejs-lts -y 2>/dev/null
+            else
+                log_info "Installation via fnm..."
+                curl -fsSL https://fnm.vercel.app/install | bash -s -- --skip-shell
+                export PATH="$HOME/.local/share/fnm:$PATH"
+                eval "$(fnm env 2>/dev/null)" || true
+                fnm install 20 2>/dev/null && fnm use 20 2>/dev/null
+            fi
+            ;;
+    esac
+    
+    # Recharger le PATH
+    hash -r 2>/dev/null || true
+}
+
+# ============================================
+# INSTALLATION AUTOMATIQUE DE PYTHON
+# ============================================
+
+install_python() {
+    log_info "Détection de la méthode d'installation pour $OS..."
+    
+    case "$OS" in
+        Mac)
+            if check_command brew; then
+                log_info "Installation via Homebrew..."
+                brew install python@3.12
+                brew link python@3.12 --force --overwrite 2>/dev/null || true
+                export PATH="/opt/homebrew/opt/python@3.12/bin:$PATH"
+                export PATH="/usr/local/opt/python@3.12/bin:$PATH"
+            else
+                log_error "Homebrew requis pour installer Python sur Mac"
+                log_info "  → Installez Homebrew: /bin/bash -c \"\$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)\""
+            fi
+            ;;
+        Linux)
+            if check_command apt-get; then
+                log_info "Installation via apt..."
+                sudo apt-get update 2>/dev/null
+                sudo apt-get install -y python3 python3-pip python3-venv 2>/dev/null
+            elif check_command dnf; then
+                log_info "Installation via dnf..."
+                sudo dnf install -y python3 python3-pip 2>/dev/null
+            elif check_command pacman; then
+                log_info "Installation via pacman..."
+                sudo pacman -S --noconfirm python python-pip 2>/dev/null
+            else
+                log_error "Gestionnaire de paquets non reconnu"
+            fi
+            ;;
+        Windows)
+            if check_command choco; then
+                log_info "Installation via Chocolatey..."
+                choco install python -y 2>/dev/null
+            elif check_command winget; then
+                log_info "Installation via winget..."
+                winget install Python.Python.3.12 --accept-source-agreements --accept-package-agreements 2>/dev/null
+            else
+                log_error "Chocolatey ou winget requis pour installer Python sur Windows"
+                log_info "  → Téléchargez Python depuis https://python.org"
+            fi
+            ;;
+    esac
+    
+    # Recharger le PATH
+    hash -r 2>/dev/null || true
+}
+
 check_prerequisites() {
     log_step "🔍 Vérification des prérequis"
     
@@ -139,13 +261,31 @@ check_prerequisites() {
             log_success "Python 3 trouvé (v$PYTHON_VERSION)"
             PYTHON_CMD="python"
         else
-            log_error "Python 3 requis (trouvé: Python $PYTHON_VERSION)"
-            missing=1
+            log_warning "Python 3 requis (trouvé: Python $PYTHON_VERSION) - tentative d'installation..."
+            install_python
+            if check_command python3; then
+                PYTHON_VERSION=$(python3 --version 2>&1 | cut -d' ' -f2)
+                log_success "Python 3 installé avec succès (v$PYTHON_VERSION)"
+                PYTHON_CMD="python3"
+            else
+                log_error "Échec de l'installation automatique de Python"
+                missing=1
+            fi
         fi
     else
-        log_error "Python 3 non trouvé"
-        log_info "  → Installez Python 3.10+ depuis https://python.org"
-        missing=1
+        log_warning "Python 3 non trouvé - tentative d'installation automatique..."
+        install_python
+        
+        # Re-vérifier après installation
+        if check_command python3; then
+            PYTHON_VERSION=$(python3 --version 2>&1 | cut -d' ' -f2)
+            log_success "Python 3 installé avec succès (v$PYTHON_VERSION)"
+            PYTHON_CMD="python3"
+        else
+            log_error "Échec de l'installation automatique de Python"
+            log_info "  → Installez manuellement Python 3.10+ depuis https://python.org"
+            missing=1
+        fi
     fi
     
     # Node.js
@@ -159,9 +299,18 @@ check_prerequisites() {
             log_warning "Node.js 20+ recommandé pour Expo (trouvé: $NODE_VERSION)"
         fi
     else
-        log_error "Node.js non trouvé"
-        log_info "  → Installez Node.js 20 LTS depuis https://nodejs.org"
-        missing=1
+        log_warning "Node.js non trouvé - tentative d'installation automatique..."
+        install_node
+        
+        # Re-vérifier après installation
+        if check_command node; then
+            NODE_VERSION=$(node --version 2>&1)
+            log_success "Node.js installé avec succès ($NODE_VERSION)"
+        else
+            log_error "Échec de l'installation automatique de Node.js"
+            log_info "  → Installez manuellement Node.js 20 LTS depuis https://nodejs.org"
+            missing=1
+        fi
     fi
     
     # pnpm
