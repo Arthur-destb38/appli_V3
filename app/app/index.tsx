@@ -33,32 +33,24 @@ export default function HomeScreen() {
   const drawerAnim = useRef(new Animated.Value(0)).current;
   const insets = useSafeAreaInsets();
 
-  useEffect(() => {
-    if (!authLoading && !isAuthenticated) {
-      router.replace('/login');
-    }
-  }, [isAuthenticated, authLoading, router]);
-
-  if (authLoading) {
-    return (
-      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-        <ActivityIndicator size="large" />
-      </View>
-    );
-  }
-
-  if (!isAuthenticated) {
-    return null;
-  }
-
-  const handleCreate = async () => {
-    const draft = await createDraft();
-    if (draft) {
-      router.push(`/create?id=${draft.workout.id}`);
-    }
-  };
-
+  // Tous les hooks doivent être appelés avant les retours conditionnels
   const stats = useMemo(() => {
+    if (!workouts.length) {
+      return {
+        total: 0,
+        completed: 0,
+        completionRate: 0,
+        completedThisWeek: 0,
+        liftedThisWeek: 0,
+        volume7d: 0,
+        sessions7d: 0,
+        avgVolumeSession: 0,
+        prevVolume7d: 0,
+        prevSessions7d: 0,
+        muscleVolume: {} as Record<string, number>,
+        weeks: [] as Array<{ label: string; count: number }>,
+      };
+    }
     const total = workouts.length;
     const completed = workouts.filter((item) => item.workout.status === 'completed');
     const completedThisWeek = completed.filter((item) => {
@@ -159,6 +151,32 @@ export default function HomeScreen() {
   );
 
   const recentWorkouts = useMemo(() => workouts.slice(0, 5), [workouts]);
+
+  useEffect(() => {
+    if (!authLoading && !isAuthenticated) {
+      router.replace('/login');
+    }
+  }, [isAuthenticated, authLoading, router]);
+
+  const handleCreate = async () => {
+    const draft = await createDraft();
+    if (draft) {
+      router.push(`/create?id=${draft.workout.id}`);
+    }
+  };
+
+  if (authLoading) {
+    return (
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+        <ActivityIndicator size="large" />
+      </View>
+    );
+  }
+
+  if (!isAuthenticated) {
+    return null;
+  }
+
   const handleLaunchNext = async () => {
     if (nextWorkout) {
       router.push(`/track/${nextWorkout.workout.id}`);
