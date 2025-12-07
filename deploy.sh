@@ -130,6 +130,9 @@ check_command() {
 install_node() {
     log_info "Détection de la méthode d'installation pour $OS..."
     
+    # Créer un dossier local pour Node si besoin
+    LOCAL_NODE_DIR="$SCRIPT_DIR/.local_node"
+    
     case "$OS" in
         Mac)
             # Essayer Homebrew d'abord
@@ -137,53 +140,74 @@ install_node() {
                 log_info "Installation via Homebrew..."
                 brew install node@20
                 brew link node@20 --force --overwrite 2>/dev/null || true
-                # Ajouter au PATH pour cette session
                 export PATH="/opt/homebrew/opt/node@20/bin:$PATH"
                 export PATH="/usr/local/opt/node@20/bin:$PATH"
             else
-                # Installer via le script officiel (fnm ou nvm)
-                log_info "Homebrew non trouvé, installation via fnm..."
-                curl -fsSL https://fnm.vercel.app/install | bash -s -- --skip-shell
-                export PATH="$HOME/.local/share/fnm:$PATH"
-                eval "$(fnm env 2>/dev/null)" || true
-                fnm install 20 2>/dev/null && fnm use 20 2>/dev/null
+                # Télécharger Node.js directement (portable, sans sudo)
+                log_info "Téléchargement de Node.js 20 (portable)..."
+                mkdir -p "$LOCAL_NODE_DIR"
+                
+                # Détecter l'architecture
+                if [ "$ARCH" = "arm64" ]; then
+                    NODE_ARCH="arm64"
+                else
+                    NODE_ARCH="x64"
+                fi
+                
+                NODE_VERSION="v20.18.0"
+                NODE_URL="https://nodejs.org/dist/${NODE_VERSION}/node-${NODE_VERSION}-darwin-${NODE_ARCH}.tar.gz"
+                
+                log_info "Téléchargement depuis $NODE_URL..."
+                curl -fsSL "$NODE_URL" -o "$LOCAL_NODE_DIR/node.tar.gz"
+                
+                log_info "Extraction..."
+                tar -xzf "$LOCAL_NODE_DIR/node.tar.gz" -C "$LOCAL_NODE_DIR" --strip-components=1
+                rm -f "$LOCAL_NODE_DIR/node.tar.gz"
+                
+                # Ajouter au PATH
+                export PATH="$LOCAL_NODE_DIR/bin:$PATH"
+                log_success "Node.js installé localement dans $LOCAL_NODE_DIR"
             fi
             ;;
         Linux)
-            # Essayer plusieurs méthodes
+            # Essayer les gestionnaires de paquets d'abord
             if check_command apt-get; then
-                # Debian/Ubuntu - utiliser NodeSource
                 log_info "Installation via NodeSource (apt)..."
                 curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash - 2>/dev/null
                 sudo apt-get install -y nodejs 2>/dev/null
             elif check_command dnf; then
-                # Fedora/RHEL
                 log_info "Installation via dnf..."
                 sudo dnf install -y nodejs 2>/dev/null
             elif check_command pacman; then
-                # Arch Linux
                 log_info "Installation via pacman..."
                 sudo pacman -S --noconfirm nodejs npm 2>/dev/null
             else
-                # Fallback: fnm
-                log_info "Installation via fnm..."
-                curl -fsSL https://fnm.vercel.app/install | bash -s -- --skip-shell
-                export PATH="$HOME/.local/share/fnm:$PATH"
-                eval "$(fnm env 2>/dev/null)" || true
-                fnm install 20 2>/dev/null && fnm use 20 2>/dev/null
+                # Fallback: téléchargement direct
+                log_info "Téléchargement de Node.js 20 (portable)..."
+                mkdir -p "$LOCAL_NODE_DIR"
+                
+                NODE_VERSION="v20.18.0"
+                NODE_URL="https://nodejs.org/dist/${NODE_VERSION}/node-${NODE_VERSION}-linux-x64.tar.gz"
+                
+                curl -fsSL "$NODE_URL" -o "$LOCAL_NODE_DIR/node.tar.gz"
+                tar -xzf "$LOCAL_NODE_DIR/node.tar.gz" -C "$LOCAL_NODE_DIR" --strip-components=1
+                rm -f "$LOCAL_NODE_DIR/node.tar.gz"
+                
+                export PATH="$LOCAL_NODE_DIR/bin:$PATH"
+                log_success "Node.js installé localement dans $LOCAL_NODE_DIR"
             fi
             ;;
         Windows)
-            # Sur Windows (Git Bash/MSYS), utiliser fnm ou chocolatey
             if check_command choco; then
                 log_info "Installation via Chocolatey..."
                 choco install nodejs-lts -y 2>/dev/null
+            elif check_command winget; then
+                log_info "Installation via winget..."
+                winget install OpenJS.NodeJS.LTS --accept-source-agreements --accept-package-agreements 2>/dev/null
             else
-                log_info "Installation via fnm..."
-                curl -fsSL https://fnm.vercel.app/install | bash -s -- --skip-shell
-                export PATH="$HOME/.local/share/fnm:$PATH"
-                eval "$(fnm env 2>/dev/null)" || true
-                fnm install 20 2>/dev/null && fnm use 20 2>/dev/null
+                log_error "Impossible d'installer Node.js automatiquement sur Windows"
+                log_info "  → Téléchargez Node.js 20 LTS depuis https://nodejs.org"
+                log_info "  → Ou installez Chocolatey: https://chocolatey.org/install"
             fi
             ;;
     esac
