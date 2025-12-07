@@ -152,19 +152,14 @@ export default function HomeScreen() {
 
   const recentWorkouts = useMemo(() => workouts.slice(0, 5), [workouts]);
 
+  // Redirection si pas authentifié (APRÈS tous les hooks)
   useEffect(() => {
     if (!authLoading && !isAuthenticated) {
       router.replace('/login');
     }
   }, [isAuthenticated, authLoading, router]);
 
-  const handleCreate = async () => {
-    const draft = await createDraft();
-    if (draft) {
-      router.push(`/create?id=${draft.workout.id}`);
-    }
-  };
-
+  // Retours conditionnels APRÈS tous les hooks
   if (authLoading) {
     return (
       <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
@@ -176,6 +171,13 @@ export default function HomeScreen() {
   if (!isAuthenticated) {
     return null;
   }
+
+  const handleCreate = async () => {
+    const draft = await createDraft();
+    if (draft) {
+      router.push(`/create?id=${draft.workout.id}`);
+    }
+  };
 
   const handleLaunchNext = async () => {
     if (nextWorkout) {

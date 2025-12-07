@@ -22,6 +22,7 @@ export const AuthProvider: React.FC<PropsWithChildren> = ({ children }) => {
   const [isLoading, setIsLoading] = useState(true);
 
   const loadTokens = useCallback(async () => {
+    setIsLoading(true);
     try {
       const accessToken = await SecureStore.getItemAsync(ACCESS_TOKEN_KEY);
       const refreshTokenValue = await SecureStore.getItemAsync(REFRESH_TOKEN_KEY);
@@ -40,14 +41,19 @@ export const AuthProvider: React.FC<PropsWithChildren> = ({ children }) => {
             setUser(userData);
           } catch (refreshError) {
             // Refresh failed, clear tokens
+            console.warn('Token refresh failed, clearing tokens', refreshError);
             await SecureStore.deleteItemAsync(ACCESS_TOKEN_KEY);
             await SecureStore.deleteItemAsync(REFRESH_TOKEN_KEY);
             setUser(null);
           }
         }
+      } else {
+        // No tokens found
+        setUser(null);
       }
     } catch (error) {
       console.warn('Failed to load tokens', error);
+      setUser(null);
     } finally {
       setIsLoading(false);
     }
