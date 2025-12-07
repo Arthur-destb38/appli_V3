@@ -1,4 +1,4 @@
-import { buildApiUrl } from '@/utils/api';
+import { buildApiUrl, getAuthHeaders } from '@/utils/api';
 import { Program } from '@/types/program';
 
 const PROGRAMS_BASE = buildApiUrl('/programs');
@@ -13,9 +13,10 @@ export type GenerateProgramPayload = {
 };
 
 export const generateProgram = async (payload: GenerateProgramPayload): Promise<Program> => {
+  const headers = await getAuthHeaders();
   const response = await fetch(`${PROGRAMS_BASE}/generate`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers,
     body: JSON.stringify({
       title: payload.title || 'Programme personnalisé',
       objective: payload.objective,

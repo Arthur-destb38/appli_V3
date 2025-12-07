@@ -1,4 +1,4 @@
-import { buildApiUrl } from '@/utils/api';
+import { buildApiUrl, getAuthHeaders } from '@/utils/api';
 
 const STORIES_BASE = buildApiUrl('/stories');
 
@@ -14,7 +14,10 @@ export type Story = {
 };
 
 export const fetchStories = async (): Promise<Story[]> => {
-  const response = await fetch(STORIES_BASE);
+  const headers = await getAuthHeaders();
+  const response = await fetch(STORIES_BASE, {
+    headers,
+  });
   if (!response.ok) {
     throw new Error('Impossible de charger les stories');
   }

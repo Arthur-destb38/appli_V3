@@ -1,4 +1,5 @@
 import Constants from 'expo-constants';
+import * as SecureStore from 'expo-secure-store';
 
 export const getApiBaseUrl = () => {
   const extraApi = (Constants.expoConfig as any)?.extra?.apiUrl;
@@ -27,4 +28,15 @@ export const getApiBaseUrl = () => {
 export const buildApiUrl = (path: string) => {
   const base = getApiBaseUrl();
   return `${base.replace(/\/$/, '')}/${path.replace(/^\//, '')}`;
+};
+
+export const getAuthHeaders = async (): Promise<Record<string, string>> => {
+  const accessToken = await SecureStore.getItemAsync('access_token');
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+  };
+  if (accessToken) {
+    headers.Authorization = `Bearer ${accessToken}`;
+  }
+  return headers;
 };

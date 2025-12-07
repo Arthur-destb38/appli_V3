@@ -11,10 +11,14 @@ import {
   View,
 } from 'react-native';
 
+import { useRouter } from 'expo-router';
 import { useUserProfile } from '@/hooks/useUserProfile';
+import { useAuth } from '@/hooks/useAuth';
 
 const ProfileScreen: React.FC = () => {
+  const router = useRouter();
   const { profile, isLoading, updateProfile, error } = useUserProfile();
+  const { logout, user } = useAuth();
   const [username, setUsername] = useState('');
   const [consent, setConsent] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -95,6 +99,35 @@ const ProfileScreen: React.FC = () => {
         </TouchableOpacity>
         {error ? <Text style={styles.errorText}>{error}</Text> : null}
       </View>
+
+      {user && (
+        <View style={styles.card}>
+          <Text style={styles.title}>Compte</Text>
+          <Text style={styles.subtitle}>Connecté en tant que : {user.username}</Text>
+          <TouchableOpacity
+            style={styles.logoutButton}
+            onPress={async () => {
+              Alert.alert(
+                'Déconnexion',
+                'Es-tu sûr de vouloir te déconnecter ?',
+                [
+                  { text: 'Annuler', style: 'cancel' },
+                  {
+                    text: 'Déconnexion',
+                    style: 'destructive',
+                    onPress: async () => {
+                      await logout();
+                      router.replace('/login');
+                    },
+                  },
+                ]
+              );
+            }}
+          >
+            <Text style={styles.logoutButtonText}>Se déconnecter</Text>
+          </TouchableOpacity>
+        </View>
+      )}
     </ScrollView>
   );
 };
@@ -182,6 +215,18 @@ const styles = StyleSheet.create({
   },
   loadingText: {
     color: '#475569',
+    fontSize: 16,
+  },
+  logoutButton: {
+    backgroundColor: '#EF4444',
+    paddingVertical: 14,
+    borderRadius: 12,
+    alignItems: 'center',
+    marginTop: 8,
+  },
+  logoutButtonText: {
+    color: 'white',
+    fontWeight: '700',
     fontSize: 16,
   },
 });

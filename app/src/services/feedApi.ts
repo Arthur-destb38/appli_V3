@@ -1,4 +1,4 @@
-import { buildApiUrl } from '@/utils/api';
+import { buildApiUrl, getAuthHeaders } from '@/utils/api';
 
 export type FeedItem = {
   share_id: string;
@@ -37,7 +37,10 @@ export const fetchFeed = async (userId: string, limit = 10, cursor?: string) => 
   if (cursor) {
     params.append('cursor', cursor);
   }
-  const response = await fetch(`${FEED_BASE}?${params.toString()}`);
+  const headers = await getAuthHeaders();
+  const response = await fetch(`${FEED_BASE}?${params.toString()}`, {
+    headers,
+  });
   if (!response.ok) {
     throw new Error('Impossible de charger le feed');
   }
@@ -45,9 +48,10 @@ export const fetchFeed = async (userId: string, limit = 10, cursor?: string) => 
 };
 
 export const followUser = async (followerId: string, targetId: string) => {
+  const headers = await getAuthHeaders();
   const response = await fetch(`${FOLLOW_BASE}/${targetId}`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers,
     body: JSON.stringify({ follower_id: followerId }),
   });
   if (!response.ok) {
@@ -56,9 +60,10 @@ export const followUser = async (followerId: string, targetId: string) => {
 };
 
 export const unfollowUser = async (followerId: string, targetId: string) => {
+  const headers = await getAuthHeaders();
   const response = await fetch(`${FOLLOW_BASE}/${targetId}`, {
     method: 'DELETE',
-    headers: { 'Content-Type': 'application/json' },
+    headers,
     body: JSON.stringify({ follower_id: followerId }),
   });
   if (!response.ok) {
@@ -67,7 +72,10 @@ export const unfollowUser = async (followerId: string, targetId: string) => {
 };
 
 export const fetchSharedWorkout = async (shareId: string): Promise<SharedWorkoutSnapshot> => {
-  const response = await fetch(`${SHARED_WORKOUT_BASE}/${shareId}`);
+  const headers = await getAuthHeaders();
+  const response = await fetch(`${SHARED_WORKOUT_BASE}/${shareId}`, {
+    headers,
+  });
   if (!response.ok) {
     throw new Error('Séance partagée introuvable');
   }

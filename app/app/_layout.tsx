@@ -6,6 +6,7 @@ import 'react-native-reanimated';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { WorkoutsProvider } from '@/hooks/useWorkouts';
 import { UserProfileProvider } from '@/hooks/useUserProfile';
+import { AuthProvider } from '@/hooks/useAuth';
 import { AppThemeProvider } from '@/theme/ThemeProvider';
 
 export default function RootLayout() {
@@ -14,9 +15,10 @@ export default function RootLayout() {
   return (
     <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
       <AppThemeProvider>
-        <UserProfileProvider>
-          <WorkoutsProvider>
-            <Stack>
+        <AuthProvider>
+          <UserProfileProvider>
+            <WorkoutsProvider>
+              <Stack>
           <Stack.Screen
             name="index"
             options={{ title: 'Séances', headerShown: false }}
@@ -57,9 +59,18 @@ export default function RootLayout() {
             name="modal"
             options={{ presentation: 'modal', title: 'Modal' }}
           />
+          <Stack.Screen
+            name="login"
+            options={{ title: 'Connexion', headerShown: false }}
+          />
+          <Stack.Screen
+            name="register"
+            options={{ title: 'Inscription', headerShown: false }}
+          />
             </Stack>
           </WorkoutsProvider>
         </UserProfileProvider>
+        </AuthProvider>
       </AppThemeProvider>
       <StatusBar style="auto" />
     </ThemeProvider>

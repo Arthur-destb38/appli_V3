@@ -1,4 +1,4 @@
-import { buildApiUrl } from '@/utils/api';
+import { buildApiUrl, getAuthHeaders } from '@/utils/api';
 
 export type ShareWorkoutResponse = {
   share_id: string;
@@ -16,9 +16,10 @@ export const shareWorkoutRemote = async (
   workoutId: number,
   payload: { user_id: string }
 ): Promise<ShareWorkoutResponse> => {
+  const headers = await getAuthHeaders();
   const response = await fetch(shareWorkoutUrl(workoutId), {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers,
     body: JSON.stringify(payload),
   });
 

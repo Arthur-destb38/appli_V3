@@ -1,3 +1,5 @@
+import { buildApiUrl, getAuthHeaders } from '@/utils/api';
+
 const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL ?? 'http://localhost:8000';
 
 export type PushMutationPayload = {
@@ -26,11 +28,10 @@ export const pushMutations = async (
     return { processed: 0, server_time: now, results: [] };
   }
 
+  const headers = await getAuthHeaders();
   const response = await fetch(`${API_BASE_URL}/sync/push`, {
     method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
+    headers,
     body: JSON.stringify({ mutations }),
   });
 
@@ -55,7 +56,10 @@ export type PullResponse = {
 };
 
 export const pullChanges = async (since: number): Promise<PullResponse> => {
-  const response = await fetch(`${API_BASE_URL}/sync/pull?since=${since}`);
+  const headers = await getAuthHeaders();
+  const response = await fetch(`${API_BASE_URL}/sync/pull?since=${since}`, {
+    headers,
+  });
 
   if (!response.ok) {
     const text = await response.text();

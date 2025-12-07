@@ -1,5 +1,5 @@
 import { Link, useRouter } from 'expo-router';
-import React, { useMemo, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Animated,
   Alert,
@@ -11,11 +11,13 @@ import {
   View,
   ScrollView,
   Pressable,
+  ActivityIndicator,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { EXERCISE_CATALOG } from '@/src/data/exercises';
 import { useWorkouts } from '@/hooks/useWorkouts';
+import { useAuth } from '@/hooks/useAuth';
 import { WorkoutStatus } from '@/types/workout';
 import { formatDate } from '@/utils/formatting';
 import { useAppTheme } from '@/theme/ThemeProvider';
@@ -24,6 +26,25 @@ import { AppCard } from '@/components/AppCard';
 
 export default function HomeScreen() {
   const router = useRouter();
+  const { isAuthenticated, isLoading: authLoading } = useAuth();
+
+  useEffect(() => {
+    if (!authLoading && !isAuthenticated) {
+      router.replace('/login');
+    }
+  }, [isAuthenticated, authLoading, router]);
+
+  if (authLoading) {
+    return (
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+        <ActivityIndicator size="large" />
+      </View>
+    );
+  }
+
+  if (!isAuthenticated) {
+    return null;
+  }
   const { workouts, isLoading, refresh, createDraft, deleteWorkout } = useWorkouts();
   const { theme } = useAppTheme();
   const [menuOpen, setMenuOpen] = useState(false);

@@ -1,4 +1,4 @@
-import { buildApiUrl } from '@/utils/api';
+import { buildApiUrl, getAuthHeaders } from '@/utils/api';
 
 export type UserProfilePayload = {
   id: string;
@@ -24,11 +24,10 @@ export type UserStatsResponse = {
 export const upsertRemoteProfile = async (
   payload: UserProfilePayload
 ): Promise<UserProfileResponse> => {
+  const headers = await getAuthHeaders();
   const response = await fetch(PROFILE_ENDPOINT, {
     method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
+    headers,
     body: JSON.stringify(payload),
   });
 
@@ -44,7 +43,10 @@ export const upsertRemoteProfile = async (
 };
 
 export const fetchRemoteProfile = async (id: string): Promise<UserProfileResponse | null> => {
-  const response = await fetch(`${PROFILE_ENDPOINT}/${id}`);
+  const headers = await getAuthHeaders();
+  const response = await fetch(`${PROFILE_ENDPOINT}/${id}`, {
+    headers,
+  });
   if (response.status === 404) {
     return null;
   }
@@ -57,7 +59,10 @@ export const fetchRemoteProfile = async (id: string): Promise<UserProfileRespons
 };
 
 export const fetchUserStats = async (userId: string): Promise<UserStatsResponse | null> => {
-  const response = await fetch(`${USERS_BASE}/${userId}/stats`);
+  const headers = await getAuthHeaders();
+  const response = await fetch(`${USERS_BASE}/${userId}/stats`, {
+    headers,
+  });
   if (!response.ok) return null;
   return (await response.json()) as UserStatsResponse;
 };
