@@ -210,13 +210,13 @@ export const WorkoutsProvider = ({ children }: PropsWithChildren) => {
           await setLastPullTimestamp(serverTimestamp);
         }
         if (mutated) {
-          await refresh();
+          await load();
         }
       } catch (error) {
         console.warn('Failed to pull remote changes', error);
       }
     },
-    [applyRemoteEvent, refresh]
+    [applyRemoteEvent, load]
   );
 
   const flushQueue = useCallback(async () => {
