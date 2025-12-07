@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -17,12 +17,20 @@ import { useAppTheme } from '@/theme/ThemeProvider';
 
 export default function RegisterScreen() {
   const router = useRouter();
-  const { register } = useAuth();
+  const { register, isAuthenticated, isLoading } = useAuth();
   const { theme } = useAppTheme();
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [loading, setLoading] = useState(false);
+
+  // Redirection automatique si déjà authentifié
+  useEffect(() => {
+    if (!isLoading && isAuthenticated) {
+      console.log('User already authenticated, redirecting to home...');
+      router.replace('/');
+    }
+  }, [isAuthenticated, isLoading, router]);
 
   const handleRegister = async () => {
     if (!username.trim() || !password.trim() || !confirmPassword.trim()) {
@@ -48,7 +56,8 @@ export default function RegisterScreen() {
     setLoading(true);
     try {
       await register({ username: username.trim(), password });
-      router.replace('/');
+      console.log('Registration successful, waiting for redirect...');
+      // La redirection se fera automatiquement via le useEffect ci-dessus
     } catch (error) {
       Alert.alert(
         'Erreur d\'inscription',

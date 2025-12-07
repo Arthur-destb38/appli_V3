@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -17,11 +17,19 @@ import { useAppTheme } from '@/theme/ThemeProvider';
 
 export default function LoginScreen() {
   const router = useRouter();
-  const { login } = useAuth();
+  const { login, isAuthenticated, isLoading } = useAuth();
   const { theme } = useAppTheme();
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
+
+  // Redirection automatique si déjà authentifié
+  useEffect(() => {
+    if (!isLoading && isAuthenticated) {
+      console.log('User already authenticated, redirecting to home...');
+      router.replace('/');
+    }
+  }, [isAuthenticated, isLoading, router]);
 
   const handleLogin = async () => {
     if (!username.trim() || !password.trim()) {
@@ -33,11 +41,8 @@ export default function LoginScreen() {
     try {
       console.log('Login attempt:', username.trim());
       await login({ username: username.trim(), password });
-      console.log('Login successful, redirecting...');
-      // Attendre un peu pour que l'état se mette à jour
-      setTimeout(() => {
-        router.replace('/');
-      }, 100);
+      console.log('Login successful, waiting for redirect...');
+      // La redirection se fera automatiquement via le useEffect ci-dessus
     } catch (error) {
       console.error('Login failed:', error);
       Alert.alert(
