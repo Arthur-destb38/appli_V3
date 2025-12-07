@@ -5,6 +5,7 @@
 # Usage: ./deploy.sh [options]
 #   --api-only    Lance uniquement l'API
 #   --app-only    Lance uniquement l'app mobile
+#   --tunnel      Lance l'app avec un tunnel public (accessible depuis n'importe où)
 #   --install     Installe les dépendances sans lancer
 #   --help        Affiche l'aide
 #
@@ -75,11 +76,13 @@ show_help() {
     echo "Options:"
     echo "  --api-only    Lance uniquement l'API FastAPI"
     echo "  --app-only    Lance uniquement l'app mobile Expo"
+    echo "  --tunnel      Lance avec un tunnel public (accessible depuis n'importe où)"
     echo "  --install     Installe les dépendances sans lancer l'application"
     echo "  --help        Affiche cette aide"
     echo ""
     echo "Exemples:"
     echo "  ./deploy.sh              # Installation complète + lancement"
+    echo "  ./deploy.sh --tunnel     # Lancement avec tunnel public"
     echo "  ./deploy.sh --install    # Installation uniquement"
     echo "  ./deploy.sh --api-only   # Lance seulement l'API"
     echo ""
@@ -569,8 +572,24 @@ start_app() {
         kill_port 8081 || log_warning "Le port 8081 est occupé, Expo pourrait utiliser un autre port"
     fi
     
+    # Installer ngrok si tunnel demandé
+    if [ "$USE_TUNNEL" = true ]; then
+        log_info "Mode tunnel activé - Installation de @expo/ngrok..."
+        if ! npm list -g @expo/ngrok &>/dev/null; then
+            npm install -g @expo/ngrok 2>/dev/null || sudo npm install -g @expo/ngrok 2>/dev/null || {
+                log_warning "Installation de @expo/ngrok échouée, tentative locale..."
+                pnpm add @expo/ngrok 2>/dev/null || npm install @expo/ngrok 2>/dev/null
+            }
+        fi
+    fi
+    
     log_info "Configuration de l'URL de l'API: http://$LOCAL_IP:8000"
-    log_info "Démarrage d'Expo..."
+    
+    if [ "$USE_TUNNEL" = true ]; then
+        log_info "Démarrage d'Expo avec tunnel public..."
+    else
+        log_info "Démarrage d'Expo..."
+    fi
     
     echo ""
     echo -e "${GREEN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
@@ -579,7 +598,13 @@ start_app() {
     echo ""
     echo -e "  ${CYAN}API:${NC}     http://$LOCAL_IP:8000"
     echo -e "  ${CYAN}Swagger:${NC} http://$LOCAL_IP:8000/docs"
-    echo -e "  ${CYAN}App:${NC}     Scannez le QR code avec Expo Go"
+    if [ "$USE_TUNNEL" = true ]; then
+        echo -e "  ${CYAN}App:${NC}     ${BOLD}URL publique dans le QR code ci-dessous${NC}"
+        echo -e "           ${YELLOW}(accessible depuis n'importe où !)${NC}"
+    else
+        echo -e "  ${CYAN}App:${NC}     Scannez le QR code avec Expo Go"
+        echo -e "           ${YELLOW}(même réseau Wi-Fi requis)${NC}"
+    fi
     echo ""
     echo -e "  ${YELLOW}Commandes Expo:${NC}"
     echo -e "    ${BOLD}i${NC} → Ouvrir sur simulateur iOS"
@@ -590,9 +615,15 @@ start_app() {
     echo ""
     
     # Lancer Expo avec les variables d'environnement
-    EXPO_PUBLIC_API_URL="http://$LOCAL_IP:8000" \
-    EXPO_DEV_SERVER_PORT=8081 \
-    pnpm start -- --clear
+    if [ "$USE_TUNNEL" = true ]; then
+        EXPO_PUBLIC_API_URL="http://$LOCAL_IP:8000" \
+        EXPO_DEV_SERVER_PORT=8081 \
+        pnpm start -- --tunnel --clear
+    else
+        EXPO_PUBLIC_API_URL="http://$LOCAL_IP:8000" \
+        EXPO_DEV_SERVER_PORT=8081 \
+        pnpm start -- --clear
+    fi
 }
 
 # ============================================
@@ -633,6 +664,7 @@ main() {
     API_ONLY=false
     APP_ONLY=false
     INSTALL_ONLY=false
+    USE_TUNNEL=false
     
     while [[ $# -gt 0 ]]; do
         case $1 in
@@ -642,6 +674,10 @@ main() {
                 ;;
             --app-only)
                 APP_ONLY=true
+                shift
+                ;;
+            --tunnel)
+                USE_TUNNEL=true
                 shift
                 ;;
             --install)
