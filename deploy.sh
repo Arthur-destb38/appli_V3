@@ -386,16 +386,7 @@ install_api() {
     
     cd "$SCRIPT_DIR/api"
     
-    # Créer l'environnement virtuel s'il n'existe pas
-    if [ ! -d ".venv" ] || [ ! -f ".venv/bin/pip" ] && [ "$OS" != "Windows" ] || [ ! -f ".venv/Scripts/pip" ] && [ "$OS" = "Windows" ]; then
-        log_info "Création de l'environnement virtuel Python..."
-        $PYTHON_CMD -m venv .venv
-        log_success "Environnement virtuel créé"
-    else
-        log_info "Environnement virtuel existant détecté"
-    fi
-    
-    # Déterminer le chemin d'activation selon l'OS
+    # Déterminer le chemin selon l'OS
     if [ "$OS" = "Windows" ]; then
         VENV_ACTIVATE=".venv/Scripts/activate"
         PIP_CMD=".venv/Scripts/pip"
@@ -406,24 +397,46 @@ install_api() {
         PYTHON_VENV_CMD=".venv/bin/python"
     fi
     
-    # Vérifier que pip existe avant de l'utiliser
-    if [ ! -f "$PIP_CMD" ]; then
-        log_error "pip n'a pas été trouvé dans le venv. Réessayez..."
-        $PYTHON_CMD -m venv .venv --force
+    # Créer ou recréer l'environnement virtuel si nécessaire
+    if [ ! -d ".venv" ] || [ ! -f "$PIP_CMD" ]; then
+        log_info "Création de l'environnement virtuel Python..."
+        if [ -d ".venv" ]; then
+            log_warning "Venv existant mais pip manquant, recréation..."
+            rm -rf .venv
+        fi
+        $PYTHON_CMD -m venv .venv
+        if [ ! -f "$PIP_CMD" ]; then
+            log_error "Échec de la création du venv. Vérifiez que Python est correctement installé."
+            exit 1
+        fi
+        log_success "Environnement virtuel créé"
+    else
+        log_info "Environnement virtuel existant détecté"
     fi
     
     # Activer le venv et installer les dépendances
     log_info "Installation des dépendances Python..."
     
     # Upgrade pip et installer les dépendances
-    $PIP_CMD install --upgrade pip -q || {
-        log_warning "Échec de l'upgrade pip, tentative avec python -m pip..."
-        $PYTHON_VENV_CMD -m pip install --upgrade pip -q
-    }
-    $PIP_CMD install fastapi uvicorn sqlmodel sqlalchemy pydantic alembic python-dotenv httpx -q || {
-        log_warning "Échec avec pip, tentative avec python -m pip..."
-        $PYTHON_VENV_CMD -m pip install fastapi uvicorn sqlmodel sqlalchemy pydantic alembic python-dotenv httpx -q
-    }
+    if [ -f "$PIP_CMD" ]; then
+        $PIP_CMD install --upgrade pip -q || {
+            log_warning "Échec de l'upgrade pip, tentative avec python -m pip..."
+            $PYTHON_VENV_CMD -m pip install --upgrade pip -q || {
+                log_error "Impossible d'installer pip. Vérifiez votre installation Python."
+                exit 1
+            }
+        }
+        $PIP_CMD install fastapi uvicorn sqlmodel sqlalchemy pydantic alembic python-dotenv httpx -q || {
+            log_warning "Échec avec pip, tentative avec python -m pip..."
+            $PYTHON_VENV_CMD -m pip install fastapi uvicorn sqlmodel sqlalchemy pydantic alembic python-dotenv httpx -q || {
+                log_error "Impossible d'installer les dépendances."
+                exit 1
+            }
+        }
+    else
+        log_error "pip n'a pas été trouvé dans le venv après création. Vérifiez Python."
+        exit 1
+    fi
     
     log_success "Dépendances API installées"
     
