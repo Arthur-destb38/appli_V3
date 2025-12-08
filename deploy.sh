@@ -387,7 +387,7 @@ install_api() {
     cd "$SCRIPT_DIR/api"
     
     # Créer l'environnement virtuel s'il n'existe pas
-    if [ ! -d ".venv" ]; then
+    if [ ! -d ".venv" ] || [ ! -f ".venv/bin/pip" ] && [ "$OS" != "Windows" ] || [ ! -f ".venv/Scripts/pip" ] && [ "$OS" = "Windows" ]; then
         log_info "Création de l'environnement virtuel Python..."
         $PYTHON_CMD -m venv .venv
         log_success "Environnement virtuel créé"
@@ -395,21 +395,35 @@ install_api() {
         log_info "Environnement virtuel existant détecté"
     fi
     
-    # Activer le venv et installer les dépendances
-    log_info "Installation des dépendances Python..."
-    
     # Déterminer le chemin d'activation selon l'OS
     if [ "$OS" = "Windows" ]; then
         VENV_ACTIVATE=".venv/Scripts/activate"
         PIP_CMD=".venv/Scripts/pip"
+        PYTHON_VENV_CMD=".venv/Scripts/python"
     else
         VENV_ACTIVATE=".venv/bin/activate"
         PIP_CMD=".venv/bin/pip"
+        PYTHON_VENV_CMD=".venv/bin/python"
     fi
     
+    # Vérifier que pip existe avant de l'utiliser
+    if [ ! -f "$PIP_CMD" ]; then
+        log_error "pip n'a pas été trouvé dans le venv. Réessayez..."
+        $PYTHON_CMD -m venv .venv --force
+    fi
+    
+    # Activer le venv et installer les dépendances
+    log_info "Installation des dépendances Python..."
+    
     # Upgrade pip et installer les dépendances
-    $PIP_CMD install --upgrade pip -q
-    $PIP_CMD install fastapi uvicorn sqlmodel sqlalchemy pydantic alembic python-dotenv httpx -q
+    $PIP_CMD install --upgrade pip -q || {
+        log_warning "Échec de l'upgrade pip, tentative avec python -m pip..."
+        $PYTHON_VENV_CMD -m pip install --upgrade pip -q
+    }
+    $PIP_CMD install fastapi uvicorn sqlmodel sqlalchemy pydantic alembic python-dotenv httpx -q || {
+        log_warning "Échec avec pip, tentative avec python -m pip..."
+        $PYTHON_VENV_CMD -m pip install fastapi uvicorn sqlmodel sqlalchemy pydantic alembic python-dotenv httpx -q
+    }
     
     log_success "Dépendances API installées"
     
@@ -620,6 +634,7 @@ start_app() {
         EXPO_DEV_SERVER_PORT=8081 \
         pnpm start -- --tunnel --clear
     else
+        # Expo affiche le QR code automatiquement
         EXPO_PUBLIC_API_URL="http://$LOCAL_IP:8000" \
         EXPO_DEV_SERVER_PORT=8081 \
         pnpm start -- --clear
