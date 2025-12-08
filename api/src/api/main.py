@@ -1,4 +1,5 @@
 from contextlib import asynccontextmanager
+import os
 
 from fastapi import FastAPI
 
@@ -14,11 +15,40 @@ from .routes import auth
 from .routes import shared_workouts
 from .routes import sync
 from .routes import users
+from .seeds import seed_exercises
+from .services.exercise_loader import import_exercises_from_url
+from sqlmodel import Session, select, func
+from .db import get_engine
+from .models import Exercise
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     init_db()
+    
+    # Charger les exercices au démarrage si la base est vide
+    engine = get_engine()
+    with Session(engine) as session:
+        exercise_count = session.exec(select(func.count()).select_from(Exercise)).one()
+        
+        # Si pas d'exercices, essayer de charger depuis une URL ou utiliser le seed par défaut
+        if exercise_count == 0:
+            # Vérifier si une URL d'exercices est configurée
+            exercises_url = os.getenv("EXERCISES_URL")
+            if exercises_url:
+                try:
+                    result = import_exercises_from_url(session, exercises_url, force=False)
+                    print(f"✅ Chargé {result['imported']} exercices depuis {exercises_url}")
+                except Exception as e:
+                    print(f"⚠️  Erreur lors du chargement depuis {exercises_url}: {e}")
+                    print("📦 Utilisation du seed par défaut...")
+                    seed_exercises(force=False)
+            else:
+                # Utiliser le seed par défaut
+                inserted = seed_exercises(force=False)
+                if inserted > 0:
+                    print(f"📦 {inserted} exercices par défaut chargés")
+    
     yield
 
 

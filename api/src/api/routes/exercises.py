@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Body, Depends, HTTPException, status
+from pydantic import BaseModel
 from sqlmodel import select
 
 from ..db import get_session
@@ -8,8 +9,14 @@ from ..schemas import (
     ExerciseRead,
 )
 from ..utils.slug import make_exercise_slug
+from ..services.exercise_loader import import_exercises_from_url
 
 router = APIRouter(prefix="/exercises", tags=["exercises"])
+
+
+class ImportExercisesRequest(BaseModel):
+    url: str
+    force: bool = False
 
 
 @router.get("", response_model=list[ExerciseRead], summary="List exercises")
@@ -96,3 +103,48 @@ def create_exercises_bulk(
         session.refresh(exercise)
         refreshed.append(ExerciseRead.model_validate(exercise))
     return refreshed
+
+
+@router.post("/import", summary="Importer des exercices depuis une URL (Google Drive, JSON, etc.)")
+def import_exercises(
+    payload: ImportExercisesRequest,
+    session=Depends(get_session),
+) -> dict:
+    """Importe des exercices depuis une URL externe.
+    
+    Supporte :
+    - Google Drive (lien de partage ou lien direct)
+    - Fichiers JSON hébergés publiquement
+    - URLs directes vers des fichiers JSON
+    
+    Format attendu du JSON :
+    [
+        {
+            "name": "Squat",
+            "muscle_group": "legs",
+            "equipment": "barbell",
+            "description": "Back squat focusing on quads and glutes.",
+            "image_url": "https://...",  # optionnel
+            "source_type": "external",  # optionnel
+            "source_value": "url"  # optionnel
+        },
+        ...
+    ]
+    """
+    try:
+        result = import_exercises_from_url(
+            session=session,
+            url=payload.url,
+            force=payload.force,
+        )
+        return {
+            "message": f"Import réussi : {result['imported']} exercices importés, {result['skipped']} ignorés",
+            "imported": result['imported'],
+            "skipped": result['skipped'],
+            "total": result['total'],
+        }
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Erreur lors de l'import : {str(e)}",
+        )
