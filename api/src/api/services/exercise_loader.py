@@ -75,22 +75,58 @@ def load_exercises_from_url(url: str, timeout: int = 30) -> list[dict]:
         raise ValueError("Le JSON doit être un tableau d'exercices")
     
     # Valider chaque exercice
-    required_fields = ['name', 'muscle_group', 'equipment']
     exercises = []
     for idx, item in enumerate(data):
         if not isinstance(item, dict):
             raise ValueError(f"L'exercice à l'index {idx} doit être un objet")
         
-        # Vérifier les champs requis
-        missing = [field for field in required_fields if field not in item]
-        if missing:
-            raise ValueError(f"L'exercice '{item.get('name', f'index {idx}')}' manque les champs: {', '.join(missing)}")
+        # Vérifier que le nom existe
+        if 'name' not in item:
+            raise ValueError(f"L'exercice à l'index {idx} manque le champ 'name'")
+        
+        # Mapper les différents formats possibles
+        # Format V1 : muscle_group directement
+        # Format V2 : primary_muscle ou category
+        muscle_group = (
+            item.get('muscle_group') or 
+            item.get('primary_muscle') or 
+            item.get('category') or 
+            item.get('group') or 
+            'other'
+        )
+        
+        # Normaliser le groupe musculaire (mettre en minuscules)
+        muscle_group = str(muscle_group).lower().strip()
+        
+        # Gérer equipment (peut être une chaîne ou un tableau)
+        equipment_raw = item.get('equipment', '')
+        if isinstance(equipment_raw, list):
+            # Prendre le premier équipement ou joindre avec virgule
+            equipment = equipment_raw[0] if equipment_raw else 'bodyweight'
+        else:
+            equipment = str(equipment_raw).strip() or 'bodyweight'
+        
+        # Normaliser l'équipement (mettre en minuscules)
+        equipment = equipment.lower()
+        
+        # Construire la description à partir des champs disponibles
+        description_parts = []
+        if item.get('description'):
+            description_parts.append(str(item['description']).strip())
+        if item.get('cues'):
+            description_parts.append(f"Cues: {item['cues']}")
+        if item.get('common_errors'):
+            description_parts.append(f"Common errors: {item['common_errors']}")
+        if item.get('movement_pattern'):
+            description_parts.append(f"Pattern: {item['movement_pattern']}")
+        
+        description = ' | '.join(description_parts) if description_parts else None
         
         exercises.append({
             'name': str(item['name']).strip(),
-            'muscle_group': str(item['muscle_group']).strip(),
-            'equipment': str(item['equipment']).strip(),
-            'description': str(item.get('description', '')).strip() or None,
+            'muscle_group': muscle_group,
+            'equipment': equipment,
+            'description': description,
             'image_url': str(item.get('image_url', '')).strip() or None,
             'source_type': item.get('source_type', 'external'),
             'source_value': item.get('source_value', url),
