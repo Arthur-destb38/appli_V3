@@ -149,3 +149,4 @@ Voir `exercises_example.json` dans le répertoire `api/` pour un exemple complet
 - Le champ `force: true` supprime tous les exercices existants avant d'importer
 - L'import est idempotent : relancer l'import avec les mêmes données ne créera pas de doublons
 
+

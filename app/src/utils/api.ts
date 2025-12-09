@@ -22,7 +22,7 @@ export const getApiBaseUrl = () => {
     }
   }
 
-  return 'http://localhost:8000';
+  return 'https://appli-v2.onrender.com';
 };
 
 export const buildApiUrl = (path: string) => {

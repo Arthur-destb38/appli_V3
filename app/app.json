@@ -29,7 +29,7 @@
       "favicon": "./assets/images/favicon.png"
     },
     "extra": {
-      "apiUrl": "https://api.gorillax.dev",
+      "apiUrl": "https://appli-v2.onrender.com",
       "router": {},
       "eas": {
         "projectId": "182df57d-f5e4-4de5-845d-c9ac8a63f4fe"

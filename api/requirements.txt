@@ -7,3 +7,4 @@ alembic>=1.17.0
 python-dotenv>=1.2.0
 httpx>=0.28.0
 
+

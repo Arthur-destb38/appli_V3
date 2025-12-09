@@ -11,3 +11,4 @@ services:
       - key: EXERCISES_URL
         value: "https://drive.google.com/file/d/1tK7OdUg96GSYgNPO08bukqb-gZOmxpHY/view?usp=sharing"
 
+

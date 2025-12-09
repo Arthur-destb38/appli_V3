@@ -1,6 +1,6 @@
 import { buildApiUrl, getAuthHeaders } from '@/utils/api';
 
-const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL ?? 'http://localhost:8000';
+const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL ?? 'https://appli-v2.onrender.com';
 
 export type PushMutationPayload = {
   queue_id: number;
