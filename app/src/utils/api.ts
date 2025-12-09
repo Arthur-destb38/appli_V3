@@ -1,28 +1,22 @@
 import Constants from 'expo-constants';
-import * as SecureStore from 'expo-secure-store';
+
+// URL de l'API cloud (Render)
+const CLOUD_API_URL = 'https://appli-v2.onrender.com';
 
 export const getApiBaseUrl = () => {
-  const extraApi = (Constants.expoConfig as any)?.extra?.apiUrl;
+  // 1. Variable d'environnement (pour développement local si besoin)
   if (process.env.EXPO_PUBLIC_API_URL) {
     return process.env.EXPO_PUBLIC_API_URL;
   }
+  
+  // 2. Config app.json
+  const extraApi = (Constants.expoConfig as any)?.extra?.apiUrl;
   if (extraApi) {
     return extraApi;
   }
-
-  const hostUri =
-    Constants.expoGoConfig?.hostUri ||
-    (Constants as any).manifest2?.extra?.expoGo?.hostUri ||
-    (Constants as any).manifest?.debuggerHost;
-
-  if (hostUri) {
-    const host = String(hostUri).split(':')[0];
-    if (host) {
-      return `http://${host}:8000`;
-    }
-  }
-
-  return 'https://appli-v2.onrender.com';
+  
+  // 3. Par défaut: API cloud
+  return CLOUD_API_URL;
 };
 
 export const buildApiUrl = (path: string) => {
@@ -31,12 +25,8 @@ export const buildApiUrl = (path: string) => {
 };
 
 export const getAuthHeaders = async (): Promise<Record<string, string>> => {
-  // AUTH DÉSACTIVÉE - Ne plus envoyer de token
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
   };
-  // if (accessToken) {
-  //   headers.Authorization = `Bearer ${accessToken}`;
-  // }
   return headers;
 };
