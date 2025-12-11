@@ -27,6 +27,8 @@ def upsert_profile(payload: UserProfileCreate, session=Depends(get_session)) -> 
         user = User(
             id=payload.id,
             username=payload.username,
+            email=f"{payload.id}@temp.local",  # Email par défaut pour mode démo
+            password_hash="temp_not_for_login",
             consent_to_public_share=payload.consent_to_public_share,
         )
         session.add(user)
