@@ -1,4 +1,4 @@
-import { Link, useRouter } from 'expo-router';
+import { useRouter } from 'expo-router';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Animated,
@@ -11,29 +11,34 @@ import {
   View,
   ScrollView,
   Pressable,
-  ActivityIndicator,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Ionicons } from '@expo/vector-icons';
 
 import { EXERCISE_CATALOG } from '@/src/data/exercises';
 import { useWorkouts } from '@/hooks/useWorkouts';
 import { useAuth } from '@/hooks/useAuth';
-import { WorkoutStatus } from '@/types/workout';
+import { useUserProfile } from '@/hooks/useUserProfile';
 import { formatDate } from '@/utils/formatting';
 import { useAppTheme } from '@/theme/ThemeProvider';
-import { AppButton } from '@/components/AppButton';
 import { AppCard } from '@/components/AppCard';
+import { HeroSection } from '@/components/HeroSection';
+import { QuickStatsRow } from '@/components/QuickStatsRow';
+import { NextWorkoutCard } from '@/components/NextWorkoutCard';
+import { WeekChart } from '@/components/WeekChart';
+import { WorkoutCard } from '@/components/WorkoutCard';
 
 export default function HomeScreen() {
   const router = useRouter();
   const { isAuthenticated, isLoading: authLoading } = useAuth();
+  const { profile } = useUserProfile();
   const { workouts, isLoading, refresh, createDraft, deleteWorkout } = useWorkouts();
   const { theme } = useAppTheme();
   const [menuOpen, setMenuOpen] = useState(false);
   const drawerAnim = useRef(new Animated.Value(0)).current;
   const insets = useSafeAreaInsets();
 
-  // Tous les hooks doivent être appelés avant les retours conditionnels
+  // Calcul des statistiques
   const stats = useMemo(() => {
     if (!workouts.length) {
       return {
@@ -47,21 +52,22 @@ export default function HomeScreen() {
         avgVolumeSession: 0,
         prevVolume7d: 0,
         prevSessions7d: 0,
+        streak: 0,
         muscleVolume: {} as Record<string, number>,
-        weeks: [] as Array<{ label: string; count: number }>,
+        weekDays: [] as Array<{ day: string; value: number; isToday?: boolean }>,
       };
     }
+
     const total = workouts.length;
     const completed = workouts.filter((item) => item.workout.status === 'completed');
     const completedThisWeek = completed.filter((item) => {
       const diff = Date.now() - item.workout.updated_at;
       return diff <= 7 * 24 * 60 * 60 * 1000;
     }).length;
+
     const liftedThisWeek = workouts.reduce((sum, record) => {
       const isThisWeek = Date.now() - record.workout.updated_at <= 7 * 24 * 60 * 60 * 1000;
-      if (!isThisWeek) {
-        return sum;
-      }
+      if (!isThisWeek) return sum;
       const sets = record.exercises.flatMap((exercise) => exercise.sets);
       const weeklyWeight = sets.reduce((setSum, set) => {
         if (set && typeof set.weight === 'number' && typeof set.reps === 'number') {
@@ -84,9 +90,7 @@ export default function HomeScreen() {
       records.reduce((sum, record) => {
         const sets = record.exercises.flatMap((ex) => ex.sets || []);
         const vol = sets.reduce((acc, set) => {
-          if (!set) {
-            return acc;
-          }
+          if (!set) return acc;
           const weight = typeof set.weight === 'number' ? set.weight : 0;
           const reps = typeof set.reps === 'number' ? set.reps : 0;
           return acc + weight * reps;
@@ -96,10 +100,31 @@ export default function HomeScreen() {
 
     const volume7d = calcVolume(last7d);
     const prevVolume7d = calcVolume(prev7d);
-
     const sessions7d = last7d.length;
     const prevSessions7d = prev7d.length;
     const avgVolumeSession = sessions7d ? Math.round(volume7d / sessions7d) : 0;
+
+    // Streak calculation (jours consécutifs avec au moins une séance)
+    let streak = 0;
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    
+    for (let i = 0; i < 365; i++) {
+      const checkDate = new Date(today);
+      checkDate.setDate(checkDate.getDate() - i);
+      const dayStart = checkDate.getTime();
+      const dayEnd = dayStart + 24 * 60 * 60 * 1000;
+      
+      const hasWorkout = workouts.some(
+        (w) => w.workout.updated_at >= dayStart && w.workout.updated_at < dayEnd
+      );
+      
+      if (hasWorkout) {
+        streak++;
+      } else if (i > 0) {
+        break;
+      }
+    }
 
     // Répartition musculaire 7j
     const muscleVolume: Record<string, number> = {};
@@ -118,16 +143,34 @@ export default function HomeScreen() {
       });
     });
 
-    // Séances par semaine (4 dernières)
-    const weekMs = 7 * 24 * 60 * 60 * 1000;
-    const weeks = [0, 1, 2, 3].map((idx) => {
-      const start = now - (idx + 1) * weekMs;
-      const end = now - idx * weekMs;
-      const count = workouts.filter(
-        (w) => w.workout.updated_at >= start && w.workout.updated_at < end
-      ).length;
-      return { label: `S-${idx}`, count };
-    }).reverse();
+    // Données par jour de la semaine (7 derniers jours)
+    const dayNames = ['D', 'L', 'M', 'M', 'J', 'V', 'S'];
+    const todayIndex = new Date().getDay();
+    const weekDays = Array.from({ length: 7 }, (_, i) => {
+      const date = new Date();
+      date.setDate(date.getDate() - (6 - i));
+      date.setHours(0, 0, 0, 0);
+      const dayStart = date.getTime();
+      const dayEnd = dayStart + 24 * 60 * 60 * 1000;
+      
+      const dayVolume = workouts
+        .filter((w) => w.workout.updated_at >= dayStart && w.workout.updated_at < dayEnd)
+        .reduce((sum, record) => {
+          const sets = record.exercises.flatMap((ex) => ex.sets || []);
+          return sum + sets.reduce((acc, set) => {
+            if (!set) return acc;
+            const weight = typeof set.weight === 'number' ? set.weight : 0;
+            const reps = typeof set.reps === 'number' ? set.reps : 0;
+            return acc + weight * reps;
+          }, 0);
+        }, 0);
+
+      return {
+        day: dayNames[date.getDay()],
+        value: dayVolume,
+        isToday: i === 6,
+      };
+    });
 
     return {
       total,
@@ -140,38 +183,63 @@ export default function HomeScreen() {
       avgVolumeSession,
       prevVolume7d,
       prevSessions7d,
+      streak,
       muscleVolume,
-      weeks,
+      weekDays,
     };
   }, [workouts]);
 
+  // Prochaine séance (brouillon en cours)
   const nextWorkout = useMemo(
     () => workouts.find((item) => item.workout.status !== 'completed'),
     [workouts]
   );
 
+  // 5 dernières séances
   const recentWorkouts = useMemo(() => workouts.slice(0, 5), [workouts]);
 
-  // AUTH DÉSACTIVÉE - Plus de redirection vers login
-  // useEffect(() => {
-  //   if (!authLoading && !isAuthenticated) {
-  //     console.log('Not authenticated, redirecting to login...');
-  //     router.replace('/login');
-  //   }
-  // }, [isAuthenticated, authLoading, router]);
+  // Quick stats pour les chips
+  const quickStats = useMemo(() => {
+    const volumeChange = stats.prevVolume7d > 0
+      ? Math.round(((stats.volume7d - stats.prevVolume7d) / stats.prevVolume7d) * 100)
+      : 0;
+    const sessionsChange = stats.sessions7d - stats.prevSessions7d;
 
-  // Retours conditionnels APRÈS tous les hooks
-  // if (authLoading) {
-  //   return (
-  //     <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-  //       <ActivityIndicator size="large" />
-  //     </View>
-  //   );
-  // }
-
-  // if (!isAuthenticated) {
-  //   return null;
-  // }
+    return [
+      {
+        id: 'sessions',
+        value: `${stats.completedThisWeek}/3`,
+        label: 'Objectif',
+        icon: 'checkmark-circle' as const,
+        trend: stats.completedThisWeek >= 3 ? 'up' : 'neutral' as const,
+        color: '#10B981',
+      },
+      {
+        id: 'volume',
+        value: stats.volume7d > 1000 ? `${(stats.volume7d / 1000).toFixed(1)}k` : stats.volume7d,
+        label: 'Volume (kg)',
+        icon: 'barbell' as const,
+        trend: volumeChange > 0 ? 'up' : volumeChange < 0 ? 'down' : 'neutral' as const,
+        trendValue: volumeChange !== 0 ? `${volumeChange > 0 ? '+' : ''}${volumeChange}%` : undefined,
+        color: '#667eea',
+      },
+      {
+        id: 'streak',
+        value: stats.streak,
+        label: 'Streak 🔥',
+        icon: 'flame' as const,
+        trend: stats.streak >= 7 ? 'up' : 'neutral' as const,
+        color: '#f59e0b',
+      },
+      {
+        id: 'total',
+        value: stats.total,
+        label: 'Séances totales',
+        icon: 'fitness' as const,
+        color: '#8b5cf6',
+      },
+    ];
+  }, [stats]);
 
   const handleCreate = async () => {
     const draft = await createDraft();
@@ -219,281 +287,186 @@ export default function HomeScreen() {
   };
 
   const menuItems = [
-    { label: 'Historique', route: '/history', type: 'nav' },
-    { label: 'Paramètres', route: '/settings', type: 'nav' },
+    { label: 'Historique', route: '/history', icon: 'time-outline' as const },
+    { label: 'Programmes', route: '/programs', icon: 'calendar-outline' as const },
+    { label: 'Paramètres', route: '/settings', icon: 'settings-outline' as const },
   ];
+
   const actionItems = [
-    { label: 'Créer une séance', action: () => handleCreate() },
-    { label: 'Créer un programme', action: () => router.push('/programs/create' as never) },
-    {
-      label: 'Ton coach sportif (bientôt)',
-      action: () =>
-        Alert.alert(
-          'Ton coach sportif (bientôt)',
-          [
-            '• Questions à tout moment : technique, fréquence, récup, prévention des blessures.',
-            "• Adaptations en direct : alternatives si fatigue ou manque de matériel (mêmes groupes, même objectif).",
-            "• Suggestions alimentaires de base : idées de repas / macros selon ton objectif (perte, prise, maintien).",
-            '• Plans courts : micro-cycles de 3-4 semaines avec progression charges/volume/RPE.',
-            '• Suivi & feedback : analyse des séances pour équilibrer les muscles sollicités, proposer deloads.',
-            "• Échauffement & mobilité ciblés : routines rapides selon la séance du jour et les articulations." ,
-          ].join('\n')
-        ),
-    },
+    { label: 'Créer une séance', action: () => handleCreate(), icon: 'add-circle-outline' as const },
+    { label: 'Créer un programme', action: () => router.push('/programs/create' as never), icon: 'clipboard-outline' as const },
   ];
+
   const goTo = (route: string) => {
     closeMenu();
     router.push(route as never);
   };
 
+  const username = profile?.username || 'Champion';
+  const volumeTrend = stats.prevVolume7d > 0
+    ? {
+        direction: stats.volume7d > stats.prevVolume7d ? 'up' : stats.volume7d < stats.prevVolume7d ? 'down' : 'neutral' as const,
+        value: `${stats.volume7d > stats.prevVolume7d ? '+' : ''}${Math.round(((stats.volume7d - stats.prevVolume7d) / stats.prevVolume7d) * 100)}%`,
+      }
+    : undefined;
+
   return (
-    <ScrollView
-      style={[
-        styles.container,
-        { backgroundColor: theme.colors.background, paddingTop: insets.top + 16 },
-      ]}
-      contentContainerStyle={{ paddingBottom: 32 }}
-      refreshControl={<RefreshControl refreshing={isLoading} onRefresh={refresh} />}
-    >
-      <View style={styles.header}>
-        <Text style={[styles.title, { color: theme.colors.textPrimary }]}>Résumé</Text>
-        <View style={styles.headerActions}>
-          <Pressable
-            onPress={openMenu}
-            style={[
-              styles.menuButton,
-              {
-                backgroundColor: theme.colors.surface,
-                borderColor: theme.colors.border,
-                shadowColor: theme.colors.border,
-              },
-            ]}
-          >
-            <View style={[styles.menuLine, { backgroundColor: theme.colors.textPrimary }]} />
-            <View style={[styles.menuLine, { backgroundColor: theme.colors.textPrimary }]} />
-            <View style={[styles.menuLine, { backgroundColor: theme.colors.textPrimary }]} />
-          </Pressable>
-        </View>
-      </View>
-
-      <AppCard>
-        <View style={styles.progressHeader}>
-          <Text style={[styles.sectionTitle, { color: theme.colors.textSecondary }]}>Progression</Text>
-          <Text style={[styles.progressLabel, { color: theme.colors.textSecondary }]}>
-            {stats.completed}/{stats.total} séances
-          </Text>
-        </View>
-        <View style={styles.progressRow}>
-          <View style={styles.progressCircle}>
-            <Text style={[styles.progressPercent, { color: theme.colors.textPrimary }]}>{stats.completionRate}%</Text>
-            <Text style={[styles.progressCaption, { color: theme.colors.textSecondary }]}>complété</Text>
-          </View>
-          <View style={styles.progressDetails}>
-            <View style={styles.progressBar}>
-              <View
-                style={[
-                  styles.progressBarFill,
-                  { width: `${stats.completionRate}%`, backgroundColor: theme.colors.accent },
-                ]}
-              />
-            </View>
-            <Text style={[styles.statLabel, { color: theme.colors.textSecondary }]}>Taux de complétion</Text>
-            <View style={styles.progressChips}>
-              <View style={[styles.progressChip, { backgroundColor: theme.colors.surfaceMuted }]}>
-                <Text style={[styles.chipValue, { color: theme.colors.textPrimary }]}>{stats.completedThisWeek}</Text>
-                <Text style={[styles.chipLabel, { color: theme.colors.textSecondary }]}>Cette semaine</Text>
-              </View>
-              <View style={[styles.progressChip, { backgroundColor: theme.colors.surfaceMuted }]}>
-                <Text style={[styles.chipValue, { color: theme.colors.textPrimary }]}>{stats.total}</Text>
-                <Text style={[styles.chipLabel, { color: theme.colors.textSecondary }]}>Total séances</Text>
-              </View>
-              <View style={[styles.progressChip, { backgroundColor: theme.colors.surfaceMuted }]}>
-                <Text style={[styles.chipValue, { color: theme.colors.textPrimary }]}>
-                  {Math.round(stats.liftedThisWeek)}
-                </Text>
-                <Text style={[styles.chipLabel, { color: theme.colors.textSecondary }]}>Kg soulevés</Text>
-              </View>
-            </View>
-            {stats.total === 0 ? (
-              <View style={[styles.infoBanner, { backgroundColor: theme.colors.surfaceMuted }]}>
-                <Text style={[styles.infoBannerText, { color: theme.colors.textSecondary }]}>
-                  Commence par créer ta première séance pour voir des stats ici.
-                </Text>
-              </View>
-            ) : null}
-          </View>
-        </View>
-      </AppCard>
-
-      <AppCard>
-        <Text style={[styles.sectionTitle, { color: theme.colors.textSecondary }]}>Synthèse 7 jours</Text>
-        <View style={styles.metricGrid}>
-          <View style={[styles.metricBox, { backgroundColor: theme.colors.surfaceMuted }]}>
-            <Text style={[styles.metricValue, { color: theme.colors.textPrimary }]}>{stats.volume7d}</Text>
-            <Text style={[styles.metricLabel, { color: theme.colors.textSecondary }]}>Volume (kg·reps)</Text>
-          </View>
-          <View style={[styles.metricBox, { backgroundColor: theme.colors.surfaceMuted }]}>
-            <Text style={[styles.metricValue, { color: theme.colors.textPrimary }]}>{stats.sessions7d}</Text>
-            <Text style={[styles.metricLabel, { color: theme.colors.textSecondary }]}>Séances</Text>
-          </View>
-          <View style={[styles.metricBox, { backgroundColor: theme.colors.surfaceMuted }]}>
-            <Text style={[styles.metricValue, { color: theme.colors.textPrimary }]}>{stats.avgVolumeSession}</Text>
-            <Text style={[styles.metricLabel, { color: theme.colors.textSecondary }]}>Volume / séance</Text>
-          </View>
-        </View>
-        <View style={styles.metricGrid}>
-          <View style={[styles.metricBox, { backgroundColor: theme.colors.surfaceMuted }]}>
-            <Text style={[styles.metricValue, { color: theme.colors.textPrimary }]}>
-              {Math.round(stats.volume7d - stats.prevVolume7d)}
-            </Text>
-            <Text style={[styles.metricLabel, { color: theme.colors.textSecondary }]}>Δ volume vs semaine -1</Text>
-          </View>
-          <View style={[styles.metricBox, { backgroundColor: theme.colors.surfaceMuted }]}>
-            <Text style={[styles.metricValue, { color: theme.colors.textPrimary }]}>
-              {stats.sessions7d - stats.prevSessions7d}
-            </Text>
-            <Text style={[styles.metricLabel, { color: theme.colors.textSecondary }]}>Δ séances vs semaine -1</Text>
-          </View>
-        </View>
-        <Text style={[styles.subSectionTitle, { color: theme.colors.textSecondary }]}>Régularité (4 sem.)</Text>
-        <View style={styles.barRow}>
-          {stats.weeks.map((week) => (
-            <View key={week.label} style={styles.barItem}>
-              <View style={[styles.barTrack, { backgroundColor: theme.colors.surfaceMuted }]}>
-                <View
-                  style={[
-                    styles.barFill,
-                    {
-                      height: Math.max(4, Math.min(100, week.count * 20)),
-                      backgroundColor: theme.colors.accent,
-                    },
-                  ]}
-                />
-              </View>
-              <Text style={[styles.barLabel, { color: theme.colors.textSecondary }]}>{week.label}</Text>
-            </View>
-          ))}
-        </View>
-      </AppCard>
-
-      <AppCard>
-        <Text style={[styles.sectionTitle, { color: theme.colors.textSecondary }]}>Muscles ciblés (7 jours)</Text>
-        {Object.keys(stats.muscleVolume).length === 0 ? (
-          <Text style={[styles.bodyText, { color: theme.colors.textSecondary }]}>Pas assez de données.</Text>
-        ) : (
-          Object.entries(stats.muscleVolume)
-            .sort((a, b) => b[1] - a[1])
-            .slice(0, 5)
-            .map(([muscle, volume]) => {
-              const maxVolume = Math.max(...Object.values(stats.muscleVolume));
-              const width = maxVolume ? Math.max(12, (volume / maxVolume) * 100) : 12;
-              return (
-                <View key={muscle} style={styles.muscleRow}>
-                  <Text style={[styles.muscleLabel, { color: theme.colors.textPrimary }]} numberOfLines={1}>
-                    {muscle}
-                  </Text>
-                  <View style={[styles.muscleBar, { backgroundColor: theme.colors.surfaceMuted }]}>
-                    <View
-                      style={[
-                        styles.muscleBarFill,
-                        { width: `${width}%`, backgroundColor: theme.colors.accent },
-                      ]}
-                    />
-                  </View>
-                  <Text style={[styles.muscleValue, { color: theme.colors.textSecondary }]}>
-                    {Math.round(volume)} kg·reps
-                  </Text>
-                </View>
-              );
-            })
-        )}
-      </AppCard>
-
-
-      <AppCard>
-        <Text style={[styles.sectionTitle, { color: theme.colors.textSecondary }]}>Actions rapides</Text>
-        <View style={styles.quickActions}>
-          <AppButton
-            title={nextWorkout ? 'Lancer la prochaine séance' : 'Créer une séance'}
-            variant="primary"
-            style={styles.quickActionButton}
-            onPress={handleLaunchNext}
+    <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
+      <ScrollView
+        style={{ flex: 1 }}
+        contentContainerStyle={{ paddingBottom: 32 }}
+        refreshControl={<RefreshControl refreshing={isLoading} onRefresh={refresh} />}
+        showsVerticalScrollIndicator={false}
+      >
+        {/* Hero Section avec greeting et streak */}
+        <View style={{ paddingTop: insets.top }}>
+          <HeroSection
+            username={username}
+            streak={stats.streak}
+            nextWorkoutTitle={nextWorkout?.workout.title}
+            onStartWorkout={handleLaunchNext}
+            onOpenMenu={openMenu}
           />
         </View>
-      </AppCard>
 
-      <AppCard>
-        <Text style={[styles.sectionTitle, { color: theme.colors.textSecondary }]}>Réseau</Text>
-        <View style={styles.networkRow}>
-          <View style={styles.networkInfo}>
-            <Text style={[styles.cardTitle, { color: theme.colors.textPrimary }]}>Découvre et duplique</Text>
-            <Text style={[styles.bodyText, { color: theme.colors.textSecondary }]}>Accède aux séances partagées et reprends-les en un tap.</Text>
-            <View style={styles.networkChips}>
-              <View style={[styles.networkChip, { backgroundColor: theme.colors.surfaceMuted }]}
-              >
-                <Text style={[styles.networkChipText, { color: theme.colors.textPrimary }]}>Séances communautaires</Text>
-              </View>
-              <View style={[styles.networkChip, { backgroundColor: theme.colors.surfaceMuted }]}
-              >
-                <Text style={[styles.networkChipText, { color: theme.colors.textPrimary }]}>Duplication rapide</Text>
-              </View>
-            </View>
-          </View>
-          <AppButton title="Explorer le réseau" onPress={() => router.push('/feed')} />
-        </View>
-      </AppCard>
+        {/* Quick Stats Row */}
+        <QuickStatsRow stats={quickStats} />
 
-      <AppCard>
-        <Text style={[styles.sectionTitle, { color: theme.colors.textSecondary }]}>Dernières séances</Text>
-        {!recentWorkouts.length ? (
-          <View style={styles.emptyContainer}>
-            <Text style={styles.emptyTitle}>Aucune séance</Text>
-            <Text style={styles.emptySubtitle}>
-              Crée ta première séance pour la retrouver ici.
-            </Text>
-            <Link href="/create" style={styles.link}>
-              Créer une séance
-            </Link>
-          </View>
-        ) : (
-          recentWorkouts.map((item) => (
-            <View
-              key={item.workout.id}
-              style={[
-                styles.workoutCard,
-                { backgroundColor: theme.colors.surfaceMuted, borderColor: theme.colors.border },
-              ]}
-            >
-              <View style={styles.workoutHeader}>
-                <View style={{ flex: 1 }}>
-                  <Text style={[styles.cardTitle, { color: theme.colors.textPrimary }]} numberOfLines={1}>
-                    {item.workout.title || 'Séance sans nom'}
-                  </Text>
-                  <Text style={[styles.cardMeta, { color: theme.colors.textSecondary }]}>
-                    {formatDate(item.workout.updated_at)} · {translateStatus(item.workout.status)}
-                  </Text>
-                </View>
-                <View style={styles.statusPill}>
-                  <Text style={[styles.statusText, { color: theme.colors.textPrimary }]}>
-                    {item.workout.status === 'completed' ? 'Terminé' : 'Brouillon'}
-                  </Text>
-                </View>
-              </View>
-              <View style={styles.workoutActions}>
-                <AppButton
-                  title={item.workout.status === 'completed' ? 'Consulter' : 'Reprendre'}
-                  variant="secondary"
-                  style={styles.workoutActionBtn}
-                  onPress={() => router.push(`/track/${item.workout.id}`)}
-                />
-                <TouchableOpacity onPress={() => deleteWorkout(item.workout.id)}>
-                  <Text style={styles.deleteButtonText}>Supprimer</Text>
-                </TouchableOpacity>
-              </View>
-            </View>
-          ))
+        {/* Prochaine séance (si existe) */}
+        {nextWorkout && (
+          <NextWorkoutCard
+            title={nextWorkout.workout.title}
+            exercises={nextWorkout.exercises.map((e) => {
+              const catalog = EXERCISE_CATALOG.find((c) => c.id === e.exercise_id);
+              return {
+                name: catalog?.name || e.exercise_id,
+                muscle_group: catalog?.muscleGroup,
+              };
+            })}
+            setsCount={nextWorkout.exercises.reduce((sum, e) => sum + (e.sets?.length || 0), 0)}
+            estimatedDuration={Math.max(20, nextWorkout.exercises.length * 10)}
+            onStart={() => router.push(`/track/${nextWorkout.workout.id}`)}
+            onEdit={() => router.push(`/create?id=${nextWorkout.workout.id}`)}
+          />
         )}
-      </AppCard>
+
+        {/* Graphique de la semaine */}
+        <WeekChart
+          data={stats.weekDays}
+          title="Cette semaine"
+          unit="kg"
+          totalValue={stats.volume7d}
+          trend={volumeTrend}
+        />
+
+        {/* Muscles ciblés */}
+        {Object.keys(stats.muscleVolume).length > 0 && (
+          <AppCard style={{ marginHorizontal: 16, marginBottom: 16 }}>
+            <View style={styles.sectionHeaderRow}>
+              <Ionicons name="body-outline" size={18} color={theme.colors.accent} />
+              <Text style={[styles.sectionTitle, { color: theme.colors.textPrimary }]}>
+                Muscles ciblés
+              </Text>
+            </View>
+            {Object.entries(stats.muscleVolume)
+              .sort((a, b) => b[1] - a[1])
+              .slice(0, 5)
+              .map(([muscle, volume]) => {
+                const maxVolume = Math.max(...Object.values(stats.muscleVolume));
+                const width = maxVolume ? Math.max(12, (volume / maxVolume) * 100) : 12;
+                return (
+                  <View key={muscle} style={styles.muscleRow}>
+                    <Text style={[styles.muscleLabel, { color: theme.colors.textPrimary }]} numberOfLines={1}>
+                      {muscle}
+                    </Text>
+                    <View style={[styles.muscleBar, { backgroundColor: theme.colors.surfaceMuted }]}>
+                      <View
+                        style={[
+                          styles.muscleBarFill,
+                          { width: `${width}%`, backgroundColor: theme.colors.accent },
+                        ]}
+                      />
+                    </View>
+                    <Text style={[styles.muscleValue, { color: theme.colors.textSecondary }]}>
+                      {Math.round(volume)} kg
+                    </Text>
+                  </View>
+                );
+              })}
+          </AppCard>
+        )}
+
+        {/* Réseau */}
+        <AppCard style={{ marginHorizontal: 16, marginBottom: 16 }}>
+          <View style={styles.sectionHeaderRow}>
+            <Ionicons name="people-outline" size={18} color={theme.colors.accent} />
+            <Text style={[styles.sectionTitle, { color: theme.colors.textPrimary }]}>
+              Réseau
+            </Text>
+          </View>
+          <Text style={[styles.bodyText, { color: theme.colors.textSecondary }]}>
+            Découvre les séances de la communauté et partage les tiennes !
+          </Text>
+          <TouchableOpacity
+            style={[styles.networkButton, { backgroundColor: theme.colors.accent }]}
+            onPress={() => router.push('/feed')}
+          >
+            <Ionicons name="globe-outline" size={18} color="#fff" />
+            <Text style={styles.networkButtonText}>Explorer le réseau</Text>
+          </TouchableOpacity>
+        </AppCard>
+
+        {/* Dernières séances */}
+        <View style={styles.sectionContainer}>
+          <View style={styles.sectionHeader}>
+            <View style={styles.sectionHeaderRow}>
+              <Ionicons name="time-outline" size={18} color={theme.colors.accent} />
+              <Text style={[styles.sectionTitle, { color: theme.colors.textPrimary }]}>
+                Dernières séances
+              </Text>
+            </View>
+            <TouchableOpacity onPress={() => router.push('/history')}>
+              <Text style={[styles.seeAllLink, { color: theme.colors.accent }]}>
+                Voir tout
+              </Text>
+            </TouchableOpacity>
+          </View>
+
+          {!recentWorkouts.length ? (
+            <View style={[styles.emptyState, { backgroundColor: theme.colors.surface, borderColor: theme.colors.border }]}>
+              <View style={[styles.emptyIconContainer, { backgroundColor: theme.colors.surfaceMuted }]}>
+                <Text style={styles.emptyIcon}>🏋️</Text>
+              </View>
+              <Text style={[styles.emptyTitle, { color: theme.colors.textPrimary }]}>
+                Aucune séance
+              </Text>
+              <Text style={[styles.emptySubtitle, { color: theme.colors.textSecondary }]}>
+                Crée ta première séance pour la retrouver ici
+              </Text>
+              <TouchableOpacity
+                style={[styles.emptyButton, { backgroundColor: theme.colors.accent }]}
+                onPress={handleCreate}
+              >
+                <Text style={styles.emptyButtonText}>Créer une séance</Text>
+              </TouchableOpacity>
+            </View>
+          ) : (
+            recentWorkouts.map((item) => (
+              <WorkoutCard
+                key={item.workout.id}
+                title={item.workout.title}
+                date={formatDate(item.workout.updated_at)}
+                status={item.workout.status as 'draft' | 'completed' | 'in_progress'}
+                exerciseCount={item.exercises?.length}
+                onPress={() => router.push(`/track/${item.workout.id}`)}
+                onDelete={() => deleteWorkout(item.workout.id)}
+              />
+            ))
+          )}
+        </View>
+      </ScrollView>
+
+      {/* Drawer Menu */}
       {menuOpen && (
         <Pressable style={styles.overlay} onPress={closeMenu}>
           <Animated.View
@@ -503,407 +476,213 @@ export default function HomeScreen() {
               { backgroundColor: theme.colors.surface, shadowColor: theme.colors.border },
             ]}
           >
-            <Text style={[styles.drawerTitle, { color: theme.colors.textPrimary }]}>Navigation</Text>
-            {menuItems.map((item) => (
-              <TouchableOpacity key={item.route} style={styles.drawerItem} onPress={() => goTo(item.route)}>
-                <Text style={[styles.drawerItemText, { color: theme.colors.textPrimary }]}>{item.label}</Text>
+            <View style={styles.drawerHeader}>
+              <Text style={[styles.drawerTitle, { color: theme.colors.textPrimary }]}>Menu</Text>
+              <TouchableOpacity onPress={closeMenu}>
+                <Ionicons name="close" size={24} color={theme.colors.textPrimary} />
               </TouchableOpacity>
-            ))}
+            </View>
+            
             <View style={styles.drawerSection}>
-              <Text style={[styles.drawerSectionTitle, { color: theme.colors.textSecondary }]}>Actions</Text>
+              <Text style={[styles.drawerSectionTitle, { color: theme.colors.textSecondary }]}>
+                Navigation
+              </Text>
+              {menuItems.map((item) => (
+                <TouchableOpacity
+                  key={item.route}
+                  style={styles.drawerItem}
+                  onPress={() => goTo(item.route)}
+                >
+                  <Ionicons name={item.icon} size={20} color={theme.colors.textPrimary} />
+                  <Text style={[styles.drawerItemText, { color: theme.colors.textPrimary }]}>
+                    {item.label}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+
+            <View style={styles.drawerSection}>
+              <Text style={[styles.drawerSectionTitle, { color: theme.colors.textSecondary }]}>
+                Actions
+              </Text>
               {actionItems.map((item) => (
-                <TouchableOpacity key={item.label} style={styles.drawerItem} onPress={() => { item.action(); closeMenu(); }}>
-                  <Text style={[styles.drawerItemText, { color: theme.colors.textPrimary }]}>{item.label}</Text>
+                <TouchableOpacity
+                  key={item.label}
+                  style={styles.drawerItem}
+                  onPress={() => {
+                    item.action();
+                    closeMenu();
+                  }}
+                >
+                  <Ionicons name={item.icon} size={20} color={theme.colors.accent} />
+                  <Text style={[styles.drawerItemText, { color: theme.colors.textPrimary }]}>
+                    {item.label}
+                  </Text>
                 </TouchableOpacity>
               ))}
             </View>
           </Animated.View>
         </Pressable>
       )}
-    </ScrollView>
+    </View>
   );
 }
-
-const translateStatus = (status: WorkoutStatus) =>
-  status === 'completed' ? 'terminée' : 'brouillon';
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    padding: 16,
   },
-  title: {
-    fontSize: 28,
-    fontWeight: '700',
+  sectionContainer: {
+    marginHorizontal: 16,
+    marginBottom: 16,
   },
-  link: {
-    fontSize: 16,
-    color: '#E11D48',
-  },
-  header: {
+  sectionHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 16,
+    marginBottom: 14,
   },
-  headerActions: {
+  sectionHeaderRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
-  },
-  menuButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 16,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: '#CBD5F5',
-    backgroundColor: '#F8FAFC',
-    shadowColor: '#0F172A',
-    shadowOpacity: 0.1,
-    shadowOffset: { width: 0, height: 4 },
-    shadowRadius: 8,
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 3,
-  },
-  menuLine: {
-    width: 18,
-    height: 2,
-    borderRadius: 999,
-  },
-  quickActions: {
-    gap: 16,
-    marginTop: 16,
-  },
-  createActions: {
-    gap: 16,
-    marginTop: 16,
-  },
-  quickActionButton: {
-    borderWidth: 0,
-    paddingVertical: 16,
-  },
-  bodyText: {
-    fontSize: 15,
-    marginBottom: 12,
-  },
-  primaryButton: {
-    backgroundColor: '#E11D48',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderRadius: 12,
-  },
-  primaryButtonText: {
-    color: 'white',
-    fontWeight: '600',
-    fontSize: 16,
-  },
-  actionsRow: {
-    flexDirection: 'row',
-    gap: 12,
-    marginBottom: 16,
-    flexWrap: 'wrap',
-  },
-  emptyContainer: {
-    marginTop: 120,
-    alignItems: 'center',
-    gap: 12,
-  },
-  emptyTitle: {
-    fontSize: 20,
-    fontWeight: '600',
-  },
-  emptySubtitle: {
-    fontSize: 16,
-    color: '#6B7280',
-    textAlign: 'center',
-    paddingHorizontal: 32,
-  },
-  card: {
-    backgroundColor: 'white',
-    borderRadius: 16,
-    padding: 16,
-    marginBottom: 12,
-    shadowColor: '#0F172A',
-    shadowOpacity: 0.05,
-    shadowOffset: { width: 0, height: 4 },
-    shadowRadius: 12,
-    elevation: 2,
     gap: 8,
   },
-  cardTitle: {
+  sectionTitle: {
     fontSize: 18,
+    fontWeight: '700',
+    letterSpacing: -0.3,
+  },
+  seeAllLink: {
+    fontSize: 14,
     fontWeight: '600',
   },
-  cardMeta: {
+  bodyText: {
     fontSize: 14,
-    color: '#6B7280',
+    marginBottom: 16,
+    lineHeight: 20,
   },
-  deleteButton: {
-    marginTop: 8,
-  },
-  deleteButtonText: {
-    color: '#DC2626',
-    fontWeight: '700',
-  },
-  workoutCard: {
-    padding: 12,
+  networkButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    paddingVertical: 14,
     borderRadius: 14,
-    borderWidth: 1,
-    marginBottom: 12,
   },
-  workoutHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-  },
-  statusPill: {
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 999,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.08)',
-  },
-  statusText: {
-    fontSize: 12,
+  networkButtonText: {
+    color: '#fff',
+    fontSize: 15,
     fontWeight: '700',
-    textTransform: 'capitalize',
-  },
-  workoutActions: {
-    marginTop: 10,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  workoutActionBtn: {
-    flex: 1,
-    marginRight: 12,
-  },
-  metricGrid: {
-    flexDirection: 'row',
-    gap: 12,
-    marginTop: 12,
-  },
-  metricBox: {
-    flex: 1,
-    padding: 12,
-    borderRadius: 12,
-  },
-  metricValue: {
-    fontSize: 18,
-    fontWeight: '700',
-  },
-  metricLabel: {
-    fontSize: 13,
-    marginTop: 4,
-  },
-  subSectionTitle: {
-    marginTop: 16,
-    marginBottom: 8,
-    fontSize: 13,
-    fontWeight: '700',
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-  },
-  barRow: {
-    flexDirection: 'row',
-    gap: 12,
-  },
-  barItem: {
-    flex: 1,
-    alignItems: 'center',
-  },
-  barTrack: {
-    width: 18,
-    borderRadius: 10,
-    height: 100,
-    justifyContent: 'flex-end',
-  },
-  barFill: {
-    width: 18,
-    borderRadius: 10,
-  },
-  barLabel: {
-    marginTop: 6,
-    fontSize: 12,
   },
   muscleRow: {
-    marginTop: 10,
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 12,
+    gap: 12,
   },
   muscleLabel: {
     fontSize: 14,
     fontWeight: '600',
+    width: 80,
   },
   muscleBar: {
-    height: 10,
-    borderRadius: 10,
+    flex: 1,
+    height: 8,
+    borderRadius: 4,
     overflow: 'hidden',
-    marginTop: 6,
   },
   muscleBarFill: {
-    height: 10,
-    borderRadius: 10,
+    height: '100%',
+    borderRadius: 4,
   },
   muscleValue: {
     fontSize: 12,
-    marginTop: 4,
+    width: 60,
+    textAlign: 'right',
   },
-  infoBanner: {
-    marginTop: 12,
-    borderRadius: 12,
-    padding: 10,
-  },
-  infoBannerText: {
-    fontSize: 13,
-    lineHeight: 18,
-  },
-  networkRow: {
+  emptyState: {
+    padding: 32,
+    borderRadius: 20,
+    borderWidth: StyleSheet.hairlineWidth,
+    alignItems: 'center',
     gap: 12,
   },
-  networkInfo: {
-    gap: 6,
+  emptyIconContainer: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 8,
   },
-  networkChips: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-    marginTop: 6,
+  emptyIcon: {
+    fontSize: 28,
   },
-  networkChip: {
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 999,
+  emptyTitle: {
+    fontSize: 18,
+    fontWeight: '700',
   },
-  networkChipText: {
-    fontSize: 12,
+  emptySubtitle: {
+    fontSize: 14,
+    textAlign: 'center',
+    lineHeight: 20,
+  },
+  emptyButton: {
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    borderRadius: 12,
+    marginTop: 8,
+  },
+  emptyButtonText: {
+    color: '#FFFFFF',
+    fontSize: 15,
     fontWeight: '600',
   },
   overlay: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(0,0,0,0.25)',
+    backgroundColor: 'rgba(0,0,0,0.5)',
     justifyContent: 'flex-start',
     alignItems: 'flex-end',
   },
   drawer: {
-    width: 260,
+    width: 280,
     height: '100%',
-    paddingTop: 40,
-    paddingHorizontal: 24,
-    gap: 20,
-    borderTopLeftRadius: 32,
-    borderBottomLeftRadius: 32,
+    paddingTop: 60,
+    paddingHorizontal: 20,
+    borderTopLeftRadius: 24,
+    borderBottomLeftRadius: 24,
+    shadowOpacity: 0.25,
+    shadowOffset: { width: -4, height: 0 },
+    shadowRadius: 20,
+  },
+  drawerHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 32,
   },
   drawerTitle: {
-    fontSize: 22,
-    fontWeight: '700',
+    fontSize: 24,
+    fontWeight: '800',
   },
   drawerSection: {
-    marginTop: 12,
-    borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: '#E5E7EB',
-    paddingTop: 12,
+    marginBottom: 28,
   },
   drawerSectionTitle: {
     fontSize: 12,
     fontWeight: '700',
-    color: '#94A3B8',
-    marginBottom: 8,
-    letterSpacing: 0.8,
+    textTransform: 'uppercase',
+    letterSpacing: 1,
+    marginBottom: 16,
   },
   drawerItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 14,
     paddingVertical: 14,
   },
   drawerItemText: {
     fontSize: 16,
     fontWeight: '600',
-  },
-  progressHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 12,
-  },
-  progressLabel: {
-    fontSize: 13,
-    fontWeight: '600',
-  },
-  progressRow: {
-    flexDirection: 'row',
-    gap: 16,
-    alignItems: 'center',
-  },
-  progressCircle: {
-    width: 100,
-    height: 100,
-    borderRadius: 60,
-    borderWidth: 6,
-    borderColor: '#FDE0E4',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  progressPercent: {
-    fontSize: 24,
-    fontWeight: '700',
-  },
-  progressCaption: {
-    fontSize: 11,
-    textTransform: 'uppercase',
-  },
-  progressDetails: {
-    flex: 1,
-  },
-  progressBar: {
-    height: 10,
-    borderRadius: 12,
-    backgroundColor: '#F2F4F7',
-    overflow: 'hidden',
-    marginBottom: 8,
-  },
-  progressBarFill: {
-    height: '100%',
-    borderRadius: 12,
-  },
-  progressChips: {
-    flexDirection: 'column',
-    gap: 10,
-    marginTop: 12,
-  },
-  progressChip: {
-    width: '100%',
-    borderRadius: 12,
-    paddingVertical: 10,
-    paddingHorizontal: 12,
-    alignItems: 'center',
-  },
-  chipValue: {
-    fontSize: 18,
-    fontWeight: '700',
-    marginBottom: 2,
-  },
-  chipLabel: {
-    fontSize: 12,
-    textAlign: 'center',
-    lineHeight: 15,
-  },
-  weekRow: {
-    flexDirection: 'row',
-    gap: 12,
-    marginTop: 12,
-  },
-  weekStat: {
-    flex: 1,
-    borderRadius: 12,
-    paddingVertical: 12,
-    paddingHorizontal: 14,
-    alignItems: 'center',
-  },
-  weekValue: {
-    fontSize: 20,
-    fontWeight: '700',
-  },
-  weekLabel: {
-    fontSize: 13,
-    textAlign: 'center',
-    marginTop: 4,
   },
 });

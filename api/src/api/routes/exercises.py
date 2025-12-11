@@ -31,7 +31,7 @@ def list_exercises(session=Depends(get_session)) -> list[ExerciseRead]:
     response_model=ExerciseRead,
     summary="Get exercise by id",
 )
-def get_exercise(exercise_id: int, session=Depends(get_session)) -> ExerciseRead:
+def get_exercise(exercise_id: str, session=Depends(get_session)) -> ExerciseRead:
     exercise = session.get(Exercise, exercise_id)
     if exercise is None:
         raise HTTPException(

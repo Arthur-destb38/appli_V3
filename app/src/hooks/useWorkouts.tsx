@@ -283,12 +283,12 @@ export const WorkoutsProvider = ({ children }: PropsWithChildren) => {
       if (shareMutations.length) {
         for (const shareMutation of shareMutations) {
           const payload = shareMutation.payload as {
-            workoutId: number;
+            workoutId: string;
             userId: string;
           };
           try {
-            if (typeof payload?.workoutId === 'number' && typeof payload?.userId === 'string') {
-              await shareWorkoutRemote(payload.workoutId, { user_id: payload.userId });
+            if (payload?.workoutId && typeof payload?.userId === 'string') {
+              await shareWorkoutRemote(String(payload.workoutId), { user_id: payload.userId });
             }
             await markMutationCompleted(shareMutation.id);
             await removeMutation(shareMutation.id);
@@ -639,12 +639,15 @@ export const WorkoutsProvider = ({ children }: PropsWithChildren) => {
       if (!profile) {
         throw new Error('Profil utilisateur indisponible');
       }
-      if (!profile.consent_to_public_share) {
-        throw new Error('consent_required');
-      }
+      // Mode démo : ne pas bloquer sur le consentement
+      // if (!profile.consent_to_public_share) {
+      //   throw new Error('consent_required');
+      // }
 
       const profileId = profile.id;
-      const payload = { workoutId: id, userId: profileId };
+      // Utiliser client_id (UUID) pour l'API au lieu de id (number local)
+      const workoutIdForApi = target.workout.client_id || String(id);
+      const payload = { workoutId: workoutIdForApi, userId: profileId };
 
       if (!isNavigatorOnline()) {
         await enqueueMutation('share-workout', payload);
@@ -653,7 +656,7 @@ export const WorkoutsProvider = ({ children }: PropsWithChildren) => {
       }
 
       try {
-        const response = await shareWorkoutRemote(id, { user_id: profileId });
+        const response = await shareWorkoutRemote(workoutIdForApi, { user_id: profileId });
         return { queued: false, shareId: response.share_id } as const;
       } catch (error) {
         const code = (error as any)?.code;

@@ -51,10 +51,10 @@ export const TrackWorkoutScreen: React.FC<Props> = ({ workoutId, modeSport = fal
 
   if (!workout) {
     return (
-      <View style={styles.emptyContainer}>
-        <Text style={styles.emptyTitle}>Séance introuvable</Text>
-        <Text style={styles.emptySubtitle}>
-          Revenez à l’accueil pour créer ou sélectionner une séance.
+      <View style={[styles.emptyContainer, { backgroundColor: theme.colors.background }]}>
+        <Text style={[styles.emptyTitle, { color: theme.colors.textPrimary }]}>Séance introuvable</Text>
+        <Text style={[styles.emptySubtitle, { color: theme.colors.textSecondary }]}>
+          Revenez à l'accueil pour créer ou sélectionner une séance.
         </Text>
       </View>
     );
@@ -240,7 +240,7 @@ export const TrackWorkoutScreen: React.FC<Props> = ({ workoutId, modeSport = fal
                     },
                   ]}
                 />
-                <View style={styles.restRingContent}>
+                <View style={[styles.restRingContent, { backgroundColor: theme.colors.surfaceMuted }]}>
                   <Text style={[styles.restButtonText, { color: theme.colors.textPrimary }]}>
                     {timerRunning ? `${remaining}s` : 'Go'}
                   </Text>
@@ -249,19 +249,19 @@ export const TrackWorkoutScreen: React.FC<Props> = ({ workoutId, modeSport = fal
             </View>
           </View>
           {hasPendingMutations ? (
-            <View style={[styles.queueBadge, { backgroundColor: theme.colors.warningMuted }]}>
-              <Text style={[styles.queueBadgeText, { color: '#111827' }]}> 
-                {pendingMutations} action(s) en attente de synchronisation
+            <View style={[styles.queueBadge, { backgroundColor: theme.colors.warning + '20' }]}>
+              <Text style={[styles.queueBadgeText, { color: theme.colors.warning }]}> 
+                {pendingMutations} action(s) en attente
               </Text>
             </View>
           ) : null}
         </View>
       }
       ListEmptyComponent={
-        <View style={styles.emptyExercises}>
-          <Text style={styles.emptyExercisesTitle}>Aucun exercice</Text>
-          <Text style={styles.emptyExercisesSubtitle}>
-            Ajoute des exercices depuis l’écran de création pour commencer le suivi.
+        <View style={[styles.emptyExercises, { backgroundColor: theme.colors.surface }]}>
+          <Text style={[styles.emptyExercisesTitle, { color: theme.colors.textPrimary }]}>Aucun exercice</Text>
+          <Text style={[styles.emptyExercisesSubtitle, { color: theme.colors.textSecondary }]}>
+            Ajoute des exercices depuis l'écran de création pour commencer le suivi.
           </Text>
         </View>
       }
@@ -284,14 +284,23 @@ export const TrackWorkoutScreen: React.FC<Props> = ({ workoutId, modeSport = fal
               <View style={styles.exerciseHeader}>
                 <Text style={[styles.exerciseName, { color: theme.colors.textPrimary }]}>{item.exercise_id}</Text>
                 <View style={styles.exerciseActions}>
-                  <TouchableOpacity onPress={() => openVideo(item.exercise_id)} style={styles.linkButton}>
-                    <Text style={[styles.linkButtonText, { color: theme.colors.primary }]}>Vidéo</Text>
+                  <TouchableOpacity 
+                    onPress={() => openVideo(item.exercise_id)} 
+                    style={[styles.linkButton, { backgroundColor: theme.colors.surfaceMuted }]}
+                  >
+                    <Text style={[styles.linkButtonText, { color: theme.colors.accent }]}>Vidéo</Text>
                   </TouchableOpacity>
-                  <TouchableOpacity onPress={() => handleAddSet(item)} style={styles.linkButton}>
-                    <Text style={[styles.linkButtonText, { color: theme.colors.primary }]}>Nouvelle série</Text>
+                  <TouchableOpacity 
+                    onPress={() => handleAddSet(item)} 
+                    style={[styles.linkButton, { backgroundColor: theme.colors.accent }]}
+                  >
+                    <Text style={[styles.linkButtonText, { color: '#FFFFFF' }]}>+ Série</Text>
                   </TouchableOpacity>
-                  <TouchableOpacity onPress={() => handleRepeatLast(item)} style={styles.linkButton}>
-                    <Text style={[styles.linkButtonText, { color: theme.colors.primary }]}>Répéter</Text>
+                  <TouchableOpacity 
+                    onPress={() => handleRepeatLast(item)} 
+                    style={[styles.linkButton, { backgroundColor: theme.colors.surfaceMuted }]}
+                  >
+                    <Text style={[styles.linkButtonText, { color: theme.colors.textPrimary }]}>Répéter</Text>
                   </TouchableOpacity>
                 </View>
               </View>
@@ -307,8 +316,8 @@ export const TrackWorkoutScreen: React.FC<Props> = ({ workoutId, modeSport = fal
                 style={[
                   styles.setRow,
                   {
-                    backgroundColor: set.done_at ? '#DCFCE7' : theme.colors.surfaceMuted,
-                    borderColor: set.done_at ? '#16A34A33' : theme.colors.border,
+                    backgroundColor: set.done_at ? theme.colors.success + '15' : theme.colors.surfaceMuted,
+                    borderColor: set.done_at ? theme.colors.success + '40' : theme.colors.border,
                   },
                 ]}>
               <View style={styles.setHeader}>
@@ -316,9 +325,9 @@ export const TrackWorkoutScreen: React.FC<Props> = ({ workoutId, modeSport = fal
                   <Text
                     style={[
                       styles.setStatus,
-                      { color: set.done_at ? '#15803D' : theme.colors.textSecondary },
+                      { color: set.done_at ? theme.colors.success : theme.colors.textSecondary },
                     ]}>
-                    {set.done_at ? 'Validée' : 'Appui long pour valider'}
+                    {set.done_at ? '✓ Validée' : 'Appui long pour valider'}
                   </Text>
                 </View>
                 <View style={styles.stepperRow}>
@@ -346,12 +355,12 @@ export const TrackWorkoutScreen: React.FC<Props> = ({ workoutId, modeSport = fal
                 </View>
                 <View style={styles.setFooter}>
                   <TouchableOpacity onPress={() => handleToggleCompletion(set)}>
-                    <Text style={styles.validateText}>
-                      {set.done_at ? 'Marquer comme non validée' : 'Valider cette série'}
+                    <Text style={[styles.validateText, { color: theme.colors.success }]}>
+                      {set.done_at ? 'Annuler' : '✓ Valider'}
                     </Text>
                   </TouchableOpacity>
                   <TouchableOpacity onPress={() => handleRemoveSet(set.id)}>
-                    <Text style={styles.remove}>Supprimer</Text>
+                    <Text style={[styles.remove, { color: theme.colors.error }]}>Supprimer</Text>
                   </TouchableOpacity>
                 </View>
               </Pressable>
@@ -371,37 +380,37 @@ interface StepperProps {
   onDecrement: () => void;
 }
 
-const Stepper: React.FC<StepperProps> = ({ label, value, suffix = '', onIncrement, onDecrement }) => (
-  <View style={styles.stepper}>
-    <Text style={styles.stepperLabel}>{label}</Text>
-    <View style={styles.stepperControls}>
-      <TouchableOpacity onPress={onDecrement} style={styles.stepperButton}>
-        <Text style={styles.stepperButtonText}>-</Text>
-      </TouchableOpacity>
-      <Text style={styles.stepperValue}>
-        {Number.isFinite(value) ? value : 0} {suffix}
-      </Text>
-      <TouchableOpacity onPress={onIncrement} style={styles.stepperButton}>
-        <Text style={styles.stepperButtonText}>+</Text>
-      </TouchableOpacity>
+const Stepper: React.FC<StepperProps> = ({ label, value, suffix = '', onIncrement, onDecrement }) => {
+  const { theme } = useAppTheme();
+  return (
+    <View style={styles.stepper}>
+      <Text style={[styles.stepperLabel, { color: theme.colors.textSecondary }]}>{label}</Text>
+      <View style={[styles.stepperControls, { backgroundColor: theme.colors.surfaceMuted, borderColor: theme.colors.border }]}>
+        <TouchableOpacity onPress={onDecrement} style={[styles.stepperButton, { backgroundColor: theme.colors.surface }]}>
+          <Text style={[styles.stepperButtonText, { color: theme.colors.textPrimary }]}>-</Text>
+        </TouchableOpacity>
+        <Text style={[styles.stepperValue, { color: theme.colors.textPrimary }]}>
+          {Number.isFinite(value) ? value : 0} {suffix}
+        </Text>
+        <TouchableOpacity onPress={onIncrement} style={[styles.stepperButton, { backgroundColor: theme.colors.surface }]}>
+          <Text style={[styles.stepperButtonText, { color: theme.colors.textPrimary }]}>+</Text>
+        </TouchableOpacity>
+      </View>
     </View>
-  </View>
-);
+  );
+};
 
 const styles = StyleSheet.create({
   container: {
     padding: 16,
     gap: 16,
-    backgroundColor: '#0b101a',
   },
   header: {
     marginBottom: 12,
     gap: 6,
-    backgroundColor: '#0f172a',
-    borderRadius: 12,
-    padding: 12,
-    borderWidth: 1,
-    borderColor: '#121826',
+    borderRadius: 16,
+    padding: 16,
+    borderWidth: StyleSheet.hairlineWidth,
   },
   title: {
     fontSize: 24,
@@ -409,20 +418,17 @@ const styles = StyleSheet.create({
   },
   subtitle: {
     fontSize: 14,
-    color: '#cbd5e1',
   },
   queueBadge: {
     marginTop: 4,
     paddingVertical: 6,
     paddingHorizontal: 10,
     borderRadius: 999,
-    backgroundColor: '#fbbf24',
     alignSelf: 'flex-start',
   },
   queueBadgeText: {
     fontSize: 12,
     fontWeight: '600',
-    color: '#111827',
   },
   headerRow: {
     flexDirection: 'row',
@@ -488,16 +494,13 @@ const styles = StyleSheet.create({
     borderRadius: 24,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#ffffff10',
   },
   exerciseCard: {
-    backgroundColor: '#0f172a',
-    borderRadius: 14,
-    padding: 14,
+    borderRadius: 16,
+    padding: 16,
     marginBottom: 12,
-    gap: 10,
-    borderWidth: 1,
-    borderColor: '#121826',
+    gap: 12,
+    borderWidth: StyleSheet.hairlineWidth,
   },
   exerciseHeader: {
     flexDirection: 'row',
@@ -520,32 +523,25 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
     paddingHorizontal: 10,
     borderRadius: 10,
-    backgroundColor: '#eef2ff',
-    borderWidth: 1,
-    borderColor: '#c7d2fe',
     maxWidth: 140,
     alignSelf: 'flex-start',
   },
   linkButtonText: {
-    color: '#1d4ed8',
-    fontWeight: '700',
+    fontWeight: '600',
     fontSize: 13,
   },
   emptySetsHint: {
-    color: '#6B7280',
     fontStyle: 'italic',
+    fontSize: 14,
   },
   setRow: {
     borderWidth: 1,
-    borderColor: '#121826',
-    borderRadius: 12,
-    padding: 12,
+    borderRadius: 14,
+    padding: 14,
     gap: 12,
-    backgroundColor: '#0f172a',
   },
   setRowCompleted: {
-    backgroundColor: '#0f172a',
-    borderColor: '#16A34A33',
+    // Couleurs gérées dynamiquement
   },
   setHeader: {
     flexDirection: 'row',
@@ -558,10 +554,8 @@ const styles = StyleSheet.create({
   },
   setStatus: {
     fontSize: 12,
-    color: '#64748B',
   },
   setStatusDone: {
-    color: '#15803D',
     fontWeight: '600',
   },
   stepperRow: {
@@ -575,37 +569,33 @@ const styles = StyleSheet.create({
   },
   stepperLabel: {
     fontSize: 12,
-    color: '#6B7280',
     fontWeight: '600',
   },
   stepperControls: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
+    borderWidth: StyleSheet.hairlineWidth,
     borderRadius: 12,
-    paddingVertical: 4,
+    paddingVertical: 6,
     paddingHorizontal: 8,
-    backgroundColor: 'white',
   },
   stepperButton: {
-    width: 28,
-    height: 28,
+    width: 32,
+    height: 32,
     borderRadius: 10,
-    backgroundColor: '#e2e8f0',
     alignItems: 'center',
     justifyContent: 'center',
   },
   stepperButtonText: {
     fontSize: 18,
-    fontWeight: '600',
-    color: '#0F172A',
+    fontWeight: '700',
   },
   stepperValue: {
     fontSize: 16,
-    fontWeight: '600',
-    color: '#0F172A',
+    fontWeight: '700',
+    minWidth: 50,
+    textAlign: 'center',
   },
   setFooter: {
     flexDirection: 'row',
@@ -613,12 +603,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   validateText: {
-    color: '#16A34A',
     fontWeight: '600',
+    fontSize: 14,
   },
   remove: {
-    color: '#DC2626',
     fontWeight: '600',
+    fontSize: 14,
   },
   emptyContainer: {
     flex: 1,
@@ -633,15 +623,13 @@ const styles = StyleSheet.create({
   },
   emptySubtitle: {
     fontSize: 16,
-    color: '#6B7280',
     textAlign: 'center',
   },
   emptyExercises: {
-    backgroundColor: '#0f172a',
-    padding: 24,
+    padding: 32,
     borderRadius: 16,
     alignItems: 'center',
-    gap: 8,
+    gap: 12,
   },
   emptyExercisesTitle: {
     fontSize: 18,
@@ -649,22 +637,18 @@ const styles = StyleSheet.create({
   },
   emptyExercisesSubtitle: {
     fontSize: 14,
-    color: '#475569',
     textAlign: 'center',
   },
   completeButton: {
     marginTop: 24,
-    backgroundColor: '#16A34A',
     paddingVertical: 16,
     borderRadius: 16,
     alignItems: 'center',
     marginHorizontal: 4,
-    borderWidth: 1,
-    borderColor: '#0f172a',
   },
   completeText: {
     color: 'white',
-    fontWeight: '600',
+    fontWeight: '700',
     fontSize: 16,
   },
 });

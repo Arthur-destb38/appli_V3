@@ -12,6 +12,11 @@ from .routes import programs
 from .routes import stories
 from .routes import users_stats
 from .routes import share
+from .routes import likes
+from .routes import profile
+from .routes import explore
+from .routes import notifications
+from .routes import leaderboard
 from .routes import auth
 from .routes import shared_workouts
 from .routes import sync
@@ -75,6 +80,11 @@ app.include_router(programs.router)
 app.include_router(stories.router)
 app.include_router(users_stats.router)
 app.include_router(auth.router)
+app.include_router(likes.router)
+app.include_router(profile.router)
+app.include_router(explore.router)
+app.include_router(notifications.router)
+app.include_router(leaderboard.router)
 
 
 @app.get("/", tags=["meta"], summary="API metadata")

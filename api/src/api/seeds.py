@@ -9,7 +9,7 @@ from sqlmodel import select
 
 from .db import get_engine
 from .db import init_db
-from .models import Exercise, Share, User, Workout, WorkoutExercise, WorkoutSet, Story
+from .models import Exercise, Share, User, Workout, WorkoutExercise, Set, Story
 from .utils.slug import make_exercise_slug
 
 
@@ -141,6 +141,12 @@ def seed_exercises(force: bool = False) -> int:
         for item in SEED_EXERCISES:
             data = item.__dict__.copy()
             data["slug"] = make_exercise_slug(item.name, item.muscle_group)
+            # Ajouter une catégorie basée sur le muscle_group
+            data["category"] = item.muscle_group
+            # Supprimer les champs qui ne sont pas dans le modèle Exercise
+            data.pop("description", None)
+            data.pop("source_type", None)
+            data.pop("source_value", None)
             session.add(Exercise(**data))
         session.commit()
         return len(SEED_EXERCISES)
@@ -155,7 +161,7 @@ def seed_virtual_user_feed(force: bool = False) -> None:
     with Session(engine) as session:
         if force:
             session.exec(delete(Share))
-            session.exec(delete(WorkoutSet))
+            session.exec(delete(Set))
             session.exec(delete(WorkoutExercise))
             session.exec(delete(Workout))
             session.commit()
@@ -226,7 +232,7 @@ def seed_virtual_user_feed(force: bool = False) -> None:
                 session.flush()
 
                 sets_payload = [
-                    WorkoutSet(
+                    Set(
                         client_id=None,
                         workout_exercise_id=w_exo.id,
                         reps=10,
@@ -234,7 +240,7 @@ def seed_virtual_user_feed(force: bool = False) -> None:
                         created_at=now,
                         updated_at=now,
                     ),
-                    WorkoutSet(
+                    Set(
                         client_id=None,
                         workout_exercise_id=w_exo.id,
                         reps=8,

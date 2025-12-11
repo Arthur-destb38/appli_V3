@@ -10,7 +10,7 @@ from sqlalchemy.engine import Engine
 from sqlalchemy.engine.url import make_url
 from sqlmodel import Session, select, SQLModel, create_engine
 
-BASE_DIR = Path(__file__).resolve().parent.parent
+BASE_DIR = Path(__file__).resolve().parent.parent.parent  # api/
 DEFAULT_DB_PATH = BASE_DIR / "gorillax.db"
 
 _ENGINE: Optional[Engine] = None
@@ -43,6 +43,13 @@ def reset_engine() -> None:
 
 
 def init_db() -> None:
+    # Importer tous les modèles pour qu'ils soient ajoutés au metadata AVANT create_all
+    from .models import (
+        User, Workout, Exercise, WorkoutExercise, Set, Program, ProgramSession,
+        ProgramSet, Share, Follower, Like, Comment, Notification, Story,
+        RefreshToken, SyncEvent
+    )
+    
     url = _database_url()
     parsed_url = make_url(url)
     if parsed_url.get_backend_name() == "sqlite" and parsed_url.database:

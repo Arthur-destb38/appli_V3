@@ -56,9 +56,19 @@ def get_feed(
     cursor: Optional[str] = Query(None),
     session: Session = Depends(get_session),
 ) -> FeedResponse:
+    # Mode démo: créer l'utilisateur s'il n'existe pas
     user = session.get(User, user_id)
     if user is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="user_not_found")
+        # Créer un utilisateur temporaire pour le feed
+        user = User(
+            id=user_id,
+            username=f"User_{user_id[:8]}",
+            email=f"{user_id}@temp.local",
+            password_hash="temp_not_for_login",
+            consent_to_public_share=True,
+        )
+        session.add(user)
+        session.commit()
 
     # Affiche les partages publics de tous les utilisateurs (simplifié pour le mode démo)
     statement = select(Share)

@@ -19,7 +19,7 @@ class ExerciseCreate(ExerciseBase):
 
 
 class ExerciseRead(ExerciseBase):
-    id: int
+    id: str
     created_at: datetime
 
     model_config = ConfigDict(from_attributes=True)
@@ -141,20 +141,20 @@ class ProgramCreate(ProgramBase):
 
 
 class ProgramSetRead(ProgramSetBase):
-    id: int
+    id: str
 
     model_config = ConfigDict(from_attributes=True)
 
 
 class ProgramSessionRead(ProgramSessionBase):
-    id: int
+    id: str
     sets: list[ProgramSetRead]
 
     model_config = ConfigDict(from_attributes=True)
 
 
 class ProgramRead(ProgramBase):
-    id: int
+    id: str
     sessions: list[ProgramSessionRead]
 
     model_config = ConfigDict(from_attributes=True)
@@ -162,7 +162,7 @@ class ProgramRead(ProgramBase):
 
 # Stories
 class StoryRead(BaseModel):
-    id: int
+    id: str
     owner_id: str
     owner_username: str
     media_url: str

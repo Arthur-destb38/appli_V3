@@ -236,8 +236,9 @@ def generate_session_exercises(
     # Grouper les exercices par groupe musculaire
     by_group: dict[str, list[Exercise]] = defaultdict(list)
     for ex in all_exercises:
-        group = ex.muscle_group.lower()
-        by_group[group].append(ex)
+        if ex.muscle_group:
+            group = ex.muscle_group.lower()
+            by_group[group].append(ex)
     
     # Déterminer les groupes musculaires selon le type de séance
     if 'Full Body' in session_type:

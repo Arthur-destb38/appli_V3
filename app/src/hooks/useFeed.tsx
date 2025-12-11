@@ -12,6 +12,9 @@ const slugify = (value: string) =>
     .replace(/[^a-z0-9]+/g, '-')
     .replace(/(^-|-$)+/g, '') || 'exercise';
 
+// Utilisateur de démo pour le feed
+const DEMO_USER_ID = 'guest-user';
+
 export const useFeed = () => {
   const { profile } = useUserProfile();
   const { createDraft, addExercise, addSet } = useWorkouts();
@@ -20,16 +23,16 @@ export const useFeed = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // Utilise guest-user pour le mode démo
+  const userId = profile?.id || DEMO_USER_ID;
+
   const load = useCallback(
     async (reset = false) => {
-      if (!profile) {
-        return;
-      }
       setIsLoading(true);
       setError(null);
       try {
         const cursor = reset ? undefined : nextCursor ?? undefined;
-        const response = await fetchFeed(profile.id, 10, cursor);
+        const response = await fetchFeed(userId, 10, cursor);
         setItems((prev) => (reset ? response.items : [...prev, ...response.items]));
         setNextCursor(response.next_cursor);
       } catch (err) {
@@ -38,22 +41,19 @@ export const useFeed = () => {
         setIsLoading(false);
       }
     },
-    [profile, nextCursor]
+    [userId, nextCursor]
   );
 
   const toggleFollow = useCallback(
     async (targetId: string, shouldFollow: boolean) => {
-      if (!profile) {
-        return;
-      }
       if (shouldFollow) {
-        await followUser(profile.id, targetId);
+        await followUser(userId, targetId);
       } else {
-        await unfollowUser(profile.id, targetId);
+        await unfollowUser(userId, targetId);
       }
       await load(true);
     },
-    [profile, load]
+    [userId, load]
   );
 
   const duplicate = useCallback(

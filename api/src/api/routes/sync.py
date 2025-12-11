@@ -47,7 +47,10 @@ def push_mutations(payload: SyncPushRequest, session: Session = Depends(get_sess
         payload_data = mutation.payload or {}
 
         if action == "create-workout":
+            # Utiliser le user_id du payload ou générer un ID par défaut
+            user_id = payload_data.get("user_id") or payload_data.get("userId") or "guest-user"
             workout = Workout(
+                user_id=user_id,
                 client_id=payload_data.get("client_id"),
                 title=payload_data.get("title", ""),
                 status=payload_data.get("status", "draft"),
