@@ -45,7 +45,7 @@ export default function RootLayout() {
                   options={{ title: 'Nouveau programme', headerShown: true, headerBackTitle: 'Retour' }}
                 />
                 <Stack.Screen
-                  name="programs/index"
+                  name="programs"
                   options={{ title: 'Programmes', headerShown: false }}
                 />
                 <Stack.Screen
