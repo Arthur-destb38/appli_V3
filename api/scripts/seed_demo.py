@@ -1,20 +1,111 @@
-"""Script pour ajouter des données de démo au feed."""
+"""Script pour ajouter des données de démo au feed avec de vraies séances."""
 import uuid
+import random
 from datetime import datetime, timezone, timedelta
 
 from sqlalchemy import text
 from sqlmodel import Session, select
 from src.api.db import get_engine
-from src.api.models import User, Share, Follower
+from src.api.models import User, Share, Follower, Workout, WorkoutExercise, Set, Exercise
+
+
+def get_exercises_by_muscle(session: Session) -> dict:
+    """Récupère les exercices groupés par groupe musculaire."""
+    exercises = session.exec(select(Exercise)).all()
+    by_muscle = {}
+    for ex in exercises:
+        muscle = (ex.muscle_group or "other").lower()
+        if muscle not in by_muscle:
+            by_muscle[muscle] = []
+        by_muscle[muscle].append(ex)
+    return by_muscle
+
+
+def create_workout_with_exercises(
+    session: Session,
+    user_id: str,
+    title: str,
+    exercises_config: list[dict],
+    hours_ago: int,
+    exercises_by_muscle: dict,
+) -> tuple[str, int, int]:
+    """
+    Crée une séance complète avec exercices et sets.
+    exercises_config: liste de {"muscle": "chest", "sets": 4, "reps": (8, 12), "weight": (40, 80)}
+    Retourne (workout_id, exercise_count, set_count)
+    """
+    workout_time = datetime.now(timezone.utc) - timedelta(hours=hours_ago)
+    workout = Workout(
+        user_id=user_id,
+        title=title,
+        status="completed",
+        started_at=workout_time - timedelta(minutes=random.randint(45, 90)),
+        ended_at=workout_time,
+        created_at=workout_time,
+        updated_at=workout_time,
+    )
+    session.add(workout)
+    session.flush()
+    
+    total_exercises = 0
+    total_sets = 0
+    
+    for idx, config in enumerate(exercises_config):
+        muscle = config["muscle"].lower()
+        available = exercises_by_muscle.get(muscle, [])
+        
+        if not available:
+            # Fallback: prendre n'importe quel exercice
+            all_exercises = [ex for exs in exercises_by_muscle.values() for ex in exs]
+            if not all_exercises:
+                continue
+            exercise = random.choice(all_exercises)
+        else:
+            exercise = random.choice(available)
+        
+        workout_exercise = WorkoutExercise(
+            workout_id=workout.id,
+            exercise_id=exercise.id,
+            order_index=idx,
+            planned_sets=config["sets"],
+        )
+        session.add(workout_exercise)
+        session.flush()
+        
+        total_exercises += 1
+        
+        # Créer les sets
+        for set_idx in range(config["sets"]):
+            reps_range = config.get("reps", (8, 12))
+            weight_range = config.get("weight", (20, 60))
+            
+            workout_set = Set(
+                workout_exercise_id=workout_exercise.id,
+                order=set_idx,
+                reps=random.randint(reps_range[0], reps_range[1]),
+                weight=round(random.uniform(weight_range[0], weight_range[1]), 1),
+                rpe=round(random.uniform(7, 9.5), 1),
+                completed=True,
+                done_at=workout_time - timedelta(minutes=random.randint(5, 60)),
+            )
+            session.add(workout_set)
+            total_sets += 1
+    
+    return workout.id, total_exercises, total_sets
+
 
 def seed_demo_data():
     engine = get_engine()
     
     with Session(engine) as session:
-        # Vérifier si des données existent déjà
-        existing_shares = session.exec(select(Share)).first()
-        if existing_shares:
-            print("Des données existent déjà. On garde les existantes.")
+        # Récupérer les exercices par muscle
+        exercises_by_muscle = get_exercises_by_muscle(session)
+        
+        if not exercises_by_muscle:
+            print("⚠️ Aucun exercice en base. Les séances seront vides.")
+        else:
+            print(f"📚 {sum(len(v) for v in exercises_by_muscle.values())} exercices disponibles")
+            print(f"   Groupes: {', '.join(exercises_by_muscle.keys())}")
         
         # Créer/récupérer les utilisateurs de démo
         users_data = [
@@ -24,6 +115,7 @@ def seed_demo_data():
                 "email": "fitgirl.marie@demo.local",
                 "bio": "Coach fitness 💪 Paris | Objectif: inspirer les autres",
                 "objective": "Hypertrophie",
+                "avatar_url": "https://i.pravatar.cc/150?u=marie",
             },
             {
                 "id": "demo-user-2",
@@ -31,6 +123,7 @@ def seed_demo_data():
                 "email": "musclebro.tom@demo.local",
                 "bio": "Powerlifter | 5 ans d'expérience | Never skip leg day 🦵",
                 "objective": "Force",
+                "avatar_url": "https://i.pravatar.cc/150?u=tom",
             },
             {
                 "id": "demo-user-3",
@@ -38,6 +131,7 @@ def seed_demo_data():
                 "email": "coach.alex@demo.local",
                 "bio": "Coach certifié | Spécialiste perte de poids & renfo",
                 "objective": "Perte de poids",
+                "avatar_url": "https://i.pravatar.cc/150?u=alex",
             },
             {
                 "id": "guest-user",
@@ -45,15 +139,16 @@ def seed_demo_data():
                 "email": "guest@demo.local",
                 "bio": None,
                 "objective": None,
+                "avatar_url": None,
             },
         ]
         
         for user_data in users_data:
             existing = session.get(User, user_data["id"])
             if existing:
-                # Mettre à jour les champs existants
                 existing.bio = user_data.get("bio")
                 existing.objective = user_data.get("objective")
+                existing.avatar_url = user_data.get("avatar_url")
                 session.add(existing)
             else:
                 user = User(
@@ -64,79 +159,128 @@ def seed_demo_data():
                     consent_to_public_share=True,
                     bio=user_data.get("bio"),
                     objective=user_data.get("objective"),
+                    avatar_url=user_data.get("avatar_url"),
                 )
                 session.add(user)
         
         session.commit()
         
-        # Créer des partages de démo
-        shares_data = [
+        # Définir les séances de démo avec de vrais exercices
+        workouts_config = [
             {
                 "owner_id": "demo-user-1",
                 "owner_username": "FitGirl_Marie",
-                "workout_title": "Push Day - Week 4 💪",
-                "exercise_count": 5,
-                "set_count": 18,
+                "title": "Push Day - Week 4 💪",
                 "hours_ago": 2,
+                "exercises": [
+                    {"muscle": "chest", "sets": 4, "reps": (8, 12), "weight": (30, 50)},
+                    {"muscle": "chest", "sets": 4, "reps": (10, 15), "weight": (20, 35)},
+                    {"muscle": "shoulders", "sets": 3, "reps": (10, 12), "weight": (8, 15)},
+                    {"muscle": "shoulders", "sets": 3, "reps": (12, 15), "weight": (6, 12)},
+                    {"muscle": "triceps", "sets": 4, "reps": (10, 15), "weight": (15, 30)},
+                ],
             },
             {
                 "owner_id": "demo-user-2",
                 "owner_username": "MuscleBro_Tom",
-                "workout_title": "Leg Day Intense 🦵",
-                "exercise_count": 6,
-                "set_count": 24,
+                "title": "Leg Day Intense 🦵",
                 "hours_ago": 5,
+                "exercises": [
+                    {"muscle": "quadriceps", "sets": 5, "reps": (5, 8), "weight": (100, 160)},
+                    {"muscle": "quadriceps", "sets": 4, "reps": (8, 12), "weight": (80, 120)},
+                    {"muscle": "hamstrings", "sets": 4, "reps": (10, 12), "weight": (60, 100)},
+                    {"muscle": "glutes", "sets": 4, "reps": (12, 15), "weight": (40, 80)},
+                    {"muscle": "calves", "sets": 4, "reps": (15, 20), "weight": (60, 100)},
+                    {"muscle": "quadriceps", "sets": 3, "reps": (12, 15), "weight": (40, 70)},
+                ],
             },
             {
                 "owner_id": "demo-user-3",
                 "owner_username": "Coach_Alex",
-                "workout_title": "Full Body Express ⚡",
-                "exercise_count": 8,
-                "set_count": 20,
+                "title": "Full Body Express ⚡",
                 "hours_ago": 8,
+                "exercises": [
+                    {"muscle": "chest", "sets": 3, "reps": (10, 15), "weight": (40, 60)},
+                    {"muscle": "back", "sets": 3, "reps": (10, 12), "weight": (50, 80)},
+                    {"muscle": "shoulders", "sets": 3, "reps": (12, 15), "weight": (10, 20)},
+                    {"muscle": "quadriceps", "sets": 3, "reps": (12, 15), "weight": (60, 100)},
+                    {"muscle": "hamstrings", "sets": 3, "reps": (12, 15), "weight": (40, 70)},
+                    {"muscle": "biceps", "sets": 2, "reps": (12, 15), "weight": (10, 18)},
+                    {"muscle": "triceps", "sets": 2, "reps": (12, 15), "weight": (15, 25)},
+                    {"muscle": "core", "sets": 2, "reps": (15, 20), "weight": (0, 10)},
+                ],
             },
             {
                 "owner_id": "demo-user-1",
                 "owner_username": "FitGirl_Marie",
-                "workout_title": "Back & Biceps 💥",
-                "exercise_count": 6,
-                "set_count": 21,
+                "title": "Back & Biceps 💥",
                 "hours_ago": 24,
+                "exercises": [
+                    {"muscle": "back", "sets": 4, "reps": (8, 12), "weight": (40, 60)},
+                    {"muscle": "back", "sets": 4, "reps": (10, 12), "weight": (35, 55)},
+                    {"muscle": "back", "sets": 3, "reps": (12, 15), "weight": (25, 40)},
+                    {"muscle": "biceps", "sets": 3, "reps": (10, 12), "weight": (8, 14)},
+                    {"muscle": "biceps", "sets": 3, "reps": (12, 15), "weight": (6, 12)},
+                    {"muscle": "forearms", "sets": 3, "reps": (15, 20), "weight": (10, 20)},
+                ],
             },
             {
                 "owner_id": "demo-user-2",
                 "owner_username": "MuscleBro_Tom",
-                "workout_title": "Chest & Triceps 🔥",
-                "exercise_count": 5,
-                "set_count": 15,
+                "title": "Chest & Triceps 🔥",
                 "hours_ago": 48,
+                "exercises": [
+                    {"muscle": "chest", "sets": 5, "reps": (3, 6), "weight": (100, 140)},
+                    {"muscle": "chest", "sets": 4, "reps": (8, 10), "weight": (70, 100)},
+                    {"muscle": "chest", "sets": 3, "reps": (12, 15), "weight": (20, 35)},
+                    {"muscle": "triceps", "sets": 4, "reps": (8, 12), "weight": (30, 50)},
+                    {"muscle": "triceps", "sets": 3, "reps": (12, 15), "weight": (20, 35)},
+                ],
             },
         ]
         
-        for share_data in shares_data:
+        # Créer les séances et partages
+        created_shares = 0
+        for config in workouts_config:
+            # Créer la séance avec exercices
+            workout_id, exercise_count, set_count = create_workout_with_exercises(
+                session=session,
+                user_id=config["owner_id"],
+                title=config["title"],
+                exercises_config=config["exercises"],
+                hours_ago=config["hours_ago"],
+                exercises_by_muscle=exercises_by_muscle,
+            )
+            
+            # Créer le partage lié à la séance
             share = Share(
                 share_id=f"sh_{uuid.uuid4().hex[:12]}",
-                owner_id=share_data["owner_id"],
-                owner_username=share_data["owner_username"],
-                workout_title=share_data["workout_title"],
-                exercise_count=share_data["exercise_count"],
-                set_count=share_data["set_count"],
-                created_at=datetime.now(timezone.utc) - timedelta(hours=share_data["hours_ago"]),
+                owner_id=config["owner_id"],
+                owner_username=config["owner_username"],
+                workout_id=workout_id,
+                workout_title=config["title"],
+                exercise_count=exercise_count,
+                set_count=set_count,
+                created_at=datetime.now(timezone.utc) - timedelta(hours=config["hours_ago"]),
             )
             session.add(share)
+            created_shares += 1
+            print(f"   ✓ {config['title']}: {exercise_count} exos, {set_count} séries")
         
         session.commit()
         
         # Créer des relations de follow
         follow_relations = [
-            ("guest-user", "demo-user-1"),  # Moi suit FitGirl_Marie
-            ("guest-user", "demo-user-2"),  # Moi suit MuscleBro_Tom
-            ("demo-user-1", "demo-user-2"),  # Marie suit Tom
-            ("demo-user-2", "demo-user-1"),  # Tom suit Marie
-            ("demo-user-3", "demo-user-1"),  # Alex suit Marie
-            ("demo-user-3", "demo-user-2"),  # Alex suit Tom
+            ("guest-user", "demo-user-1"),
+            ("guest-user", "demo-user-2"),
+            ("guest-user", "demo-user-3"),
+            ("demo-user-1", "demo-user-2"),
+            ("demo-user-2", "demo-user-1"),
+            ("demo-user-3", "demo-user-1"),
+            ("demo-user-3", "demo-user-2"),
         ]
         
+        created_follows = 0
         for follower_id, followed_id in follow_relations:
             existing = session.exec(
                 select(Follower)
@@ -145,13 +289,14 @@ def seed_demo_data():
             ).first()
             if not existing:
                 session.add(Follower(follower_id=follower_id, followed_id=followed_id))
+                created_follows += 1
         
         session.commit()
         
-        print(f"✅ {len(shares_data)} partages de démo créés!")
-        print(f"✅ {len(follow_relations)} relations de follow créées!")
+        print(f"\n✅ {created_shares} séances de démo créées avec de vrais exercices!")
+        print(f"✅ {created_follows} relations de follow créées!")
         print("🔄 Rafraîchis la page feed pour voir les données.")
+
 
 if __name__ == "__main__":
     seed_demo_data()
-

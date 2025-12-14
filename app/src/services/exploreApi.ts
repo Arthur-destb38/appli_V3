@@ -111,3 +111,4 @@ export async function search(query: string, limit = 20): Promise<SearchResult> {
   return response.json();
 }
 
+

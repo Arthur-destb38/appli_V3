@@ -24,7 +24,7 @@ def get_shared_workout(share_id: str, session: Session = Depends(get_session)) -
             select(WorkoutExercise, Exercise)
             .join(Exercise, Exercise.id == WorkoutExercise.exercise_id)
             .where(WorkoutExercise.workout_id == share.workout_id)
-            .order_by(WorkoutExercise.order)
+            .order_by(WorkoutExercise.order_index)
         ).all()
         
         for we, ex in workout_exercises:
