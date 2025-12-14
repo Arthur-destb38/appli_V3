@@ -287,6 +287,7 @@ export default function HomeScreen() {
   };
 
   const menuItems = [
+    { label: 'Réseau', route: '/feed', icon: 'people-outline' as const },
     { label: 'Historique', route: '/history', icon: 'time-outline' as const },
     { label: 'Programmes', route: '/programs', icon: 'calendar-outline' as const },
     { label: 'Paramètres', route: '/settings', icon: 'settings-outline' as const },
@@ -395,26 +396,6 @@ export default function HomeScreen() {
               })}
           </AppCard>
         )}
-
-        {/* Réseau */}
-        <AppCard style={{ marginHorizontal: 16, marginBottom: 16 }}>
-          <View style={styles.sectionHeaderRow}>
-            <Ionicons name="people-outline" size={18} color={theme.colors.accent} />
-            <Text style={[styles.sectionTitle, { color: theme.colors.textPrimary }]}>
-              Réseau
-            </Text>
-          </View>
-          <Text style={[styles.bodyText, { color: theme.colors.textSecondary }]}>
-            Découvre les séances de la communauté et partage les tiennes !
-          </Text>
-          <TouchableOpacity
-            style={[styles.networkButton, { backgroundColor: theme.colors.accent }]}
-            onPress={() => router.push('/feed')}
-          >
-            <Ionicons name="globe-outline" size={18} color="#fff" />
-            <Text style={styles.networkButtonText}>Explorer le réseau</Text>
-          </TouchableOpacity>
-        </AppCard>
 
         {/* Dernières séances */}
         <View style={styles.sectionContainer}>
@@ -555,24 +536,6 @@ const styles = StyleSheet.create({
   seeAllLink: {
     fontSize: 14,
     fontWeight: '600',
-  },
-  bodyText: {
-    fontSize: 14,
-    marginBottom: 16,
-    lineHeight: 20,
-  },
-  networkButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    paddingVertical: 14,
-    borderRadius: 14,
-  },
-  networkButtonText: {
-    color: '#fff',
-    fontSize: 15,
-    fontWeight: '700',
   },
   muscleRow: {
     flexDirection: 'row',
