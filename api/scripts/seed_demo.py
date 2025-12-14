@@ -10,14 +10,51 @@ from src.api.models import User, Share, Follower, Workout, WorkoutExercise, Set,
 
 
 def get_exercises_by_muscle(session: Session) -> dict:
-    """Récupère les exercices groupés par groupe musculaire."""
+    """Récupère les exercices groupés par groupe musculaire avec mapping simplifié."""
     exercises = session.exec(select(Exercise)).all()
     by_muscle = {}
+    
+    # Mapping des groupes musculaires vers des catégories simples
+    muscle_mapping = {
+        # Poitrine
+        "pectorals": "chest", "upper pectorals": "chest", "lower pectorals": "chest",
+        "mid pectorals": "chest", "pectorals (sternal head)": "chest",
+        "pectorals (clavicular head)": "chest",
+        # Épaules
+        "anterior deltoids": "shoulders", "lateral deltoids": "shoulders",
+        "posterior deltoids": "shoulders", "rear deltoids": "shoulders",
+        "deltoids": "shoulders", "deltoids (anterior, medial)": "shoulders",
+        "deltoids (lateral, posterior)": "shoulders", "rear delts": "shoulders",
+        # Dos
+        "lats": "back", "mid back": "back", "upper trapezius": "back",
+        "trapezius (upper)": "back",
+        # Triceps
+        "triceps": "triceps", "triceps (medial, lateral)": "triceps",
+        "triceps (lateral head)": "triceps", "triceps (long head)": "triceps",
+        # Biceps
+        "biceps brachii": "biceps", "brachialis": "biceps",
+        "biceps (long head)": "biceps", "biceps (short head)": "biceps",
+        # Jambes
+        "quadriceps": "quadriceps", "quadriceps,glutes": "quadriceps",
+        "hamstrings": "hamstrings", "glutes,hamstrings": "hamstrings",
+        "glutes": "glutes", "gluteus medius": "glutes",
+        "adductors": "glutes",
+        "calves": "calves", "soleus": "calves", "gastrocnemius": "calves",
+        "tibialis anterior": "calves",
+        # Core
+        "rectus abdominis": "core", "obliques": "core", "lower abs": "core",
+        "grip,traps,core": "core",
+        # Avant-bras
+        "forearms": "forearms",
+    }
+    
     for ex in exercises:
-        muscle = (ex.muscle_group or "other").lower()
-        if muscle not in by_muscle:
-            by_muscle[muscle] = []
-        by_muscle[muscle].append(ex)
+        original = (ex.muscle_group or "other").lower()
+        simplified = muscle_mapping.get(original, original)
+        if simplified not in by_muscle:
+            by_muscle[simplified] = []
+        by_muscle[simplified].append(ex)
+    
     return by_muscle
 
 
