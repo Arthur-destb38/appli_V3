@@ -6,6 +6,9 @@ export type UserProfile = {
   username: string;
   consent_to_public_share: boolean;
   created_at: number;
+  bio?: string;
+  objective?: string;
+  avatar_url?: string;
 };
 
 const mapRow = (row: any): UserProfile => ({
@@ -13,6 +16,9 @@ const mapRow = (row: any): UserProfile => ({
   username: row.username,
   consent_to_public_share: Boolean(row.consent_to_public_share),
   created_at: typeof row.created_at === 'number' ? row.created_at : Number(row.created_at) || Date.now(),
+  bio: row.bio || undefined,
+  objective: row.objective || undefined,
+  avatar_url: row.avatar_url || undefined,
 });
 
 export const fetchUserProfile = async (): Promise<UserProfile | null> => {
@@ -26,6 +32,9 @@ export const fetchUserProfile = async (): Promise<UserProfile | null> => {
       username: store.userProfile.username,
       consent_to_public_share: Boolean(store.userProfile.consent_to_public_share),
       created_at: store.userProfile.created_at,
+      bio: store.userProfile.bio || undefined,
+      objective: store.userProfile.objective || undefined,
+      avatar_url: store.userProfile.avatar_url || undefined,
     };
   }
 

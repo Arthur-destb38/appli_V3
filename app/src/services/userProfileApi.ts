@@ -67,6 +67,35 @@ export const fetchUserStats = async (userId: string): Promise<UserStatsResponse 
   return (await response.json()) as UserStatsResponse;
 };
 
+export type UpdateProfilePayload = {
+  username?: string;
+  bio?: string;
+  avatar_url?: string;
+  objective?: string;
+};
+
+export const updateRemoteProfile = async (
+  userId: string,
+  payload: UpdateProfilePayload
+): Promise<UserProfileResponse> => {
+  const headers = await getAuthHeaders();
+  const response = await fetch(`${PROFILE_ENDPOINT}/${userId}`, {
+    method: 'PUT',
+    headers,
+    body: JSON.stringify(payload),
+  });
+
+  if (!response.ok) {
+    const detail = await safeReadJson(response);
+    const reason = typeof detail?.detail === 'string' ? detail.detail : undefined;
+    const error = new Error('Failed to update profile');
+    (error as any).code = reason ?? response.status;
+    throw error;
+  }
+
+  return (await response.json()) as UserProfileResponse;
+};
+
 const safeReadJson = async (response: Response) => {
   try {
     return await response.json();

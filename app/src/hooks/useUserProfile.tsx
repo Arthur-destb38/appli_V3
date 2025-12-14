@@ -115,14 +115,39 @@ export const UserProfileProvider: React.FC<PropsWithChildren> = ({ children }) =
   }, [loadProfile]);
 
   const refresh = useCallback(async () => {
+    // D'abord récupérer le profil local pour avoir l'ID
     const local = await fetchUserProfile();
+    const userId = local?.id ?? profile?.id;
+    
+    if (userId) {
+      try {
+        // Récupérer les données fraîches depuis l'API (avec bio, objective, avatar_url)
+        const remote = await fetchRemoteProfile(userId);
+        if (remote) {
+          const merged = {
+            id: remote.id,
+            username: remote.username,
+            consent_to_public_share: (remote as any).consent_to_public_share ?? local?.consent_to_public_share ?? false,
+            created_at: local?.created_at ?? Date.now(),
+            bio: (remote as any).bio,
+            objective: (remote as any).objective,
+            avatar_url: (remote as any).avatar_url,
+          };
+          setProfile(merged);
+          return merged;
+        }
+      } catch (err) {
+        console.warn('Failed to fetch remote profile during refresh', err);
+      }
+    }
+    
     if (local) {
       setProfile(local);
       return local;
     }
     const created = await pushLocal();
     return created;
-  }, [pushLocal]);
+  }, [pushLocal, profile?.id]);
 
   const updateProfile = useCallback(
     async (updates: { username?: string; consent_to_public_share?: boolean }) => {
