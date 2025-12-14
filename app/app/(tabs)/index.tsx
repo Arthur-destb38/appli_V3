@@ -282,13 +282,13 @@ export default function HomeScreen() {
 
   const menuItems = [
     { label: 'Historique', route: '/history', icon: 'time-outline' as const },
-    { label: 'Programmes', route: '/programs', icon: 'calendar-outline' as const },
+    { label: 'Mon Programme', route: '/programme', icon: 'calendar-outline' as const },
     { label: 'Paramètres', route: '/settings', icon: 'settings-outline' as const },
   ];
 
   const actionItems = [
     { label: 'Créer une séance', action: () => handleCreate(), icon: 'add-circle-outline' as const },
-    { label: 'Créer un programme', action: () => router.push('/programs/create' as never), icon: 'clipboard-outline' as const },
+    { label: 'Créer un programme', action: () => router.push('/programme/create' as never), icon: 'clipboard-outline' as const },
   ];
 
   const goTo = (route: string) => {

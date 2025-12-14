@@ -6,7 +6,7 @@ from datetime import datetime, timezone, timedelta
 from sqlalchemy import text
 from sqlmodel import Session, select
 from src.api.db import get_engine
-from src.api.models import User, Share, Follower, Workout, WorkoutExercise, Set, Exercise
+from src.api.models import User, Share, Follower, Workout, WorkoutExercise, Set, Exercise, Like, Notification
 
 
 def get_exercises_by_muscle(session: Session) -> dict:
@@ -171,6 +171,62 @@ def seed_demo_data():
                 "avatar_url": "https://i.pravatar.cc/150?u=alex",
             },
             {
+                "id": "demo-user-4",
+                "username": "Iron_Sophie",
+                "email": "iron.sophie@demo.local",
+                "bio": "CrossFit addict 🏋️‍♀️ | Marseille | WOD everyday",
+                "objective": "Endurance",
+                "avatar_url": "https://i.pravatar.cc/150?u=sophie",
+            },
+            {
+                "id": "demo-user-5",
+                "username": "Yoga_Lucas",
+                "email": "yoga.lucas@demo.local",
+                "bio": "Mobilité & force 🧘 | Yoga + Musculation = combo parfait",
+                "objective": "Remise en forme",
+                "avatar_url": "https://i.pravatar.cc/150?u=lucas",
+            },
+            {
+                "id": "demo-user-6",
+                "username": "RunnerPro_Emma",
+                "email": "runner.emma@demo.local",
+                "bio": "Marathon runner 🏃‍♀️ | Semi-marathon 1h28 | Lyon",
+                "objective": "Endurance",
+                "avatar_url": "https://i.pravatar.cc/150?u=emma",
+            },
+            {
+                "id": "demo-user-7",
+                "username": "BigLift_Max",
+                "email": "biglift.max@demo.local",
+                "bio": "Deadlift 250kg 🔥 | Squat 200kg | Bench 150kg",
+                "objective": "Force",
+                "avatar_url": "https://i.pravatar.cc/150?u=max",
+            },
+            {
+                "id": "demo-user-8",
+                "username": "Fitlife_Julie",
+                "email": "fitlife.julie@demo.local",
+                "bio": "Transformation -25kg ✨ | Partage mon parcours fitness",
+                "objective": "Perte de poids",
+                "avatar_url": "https://i.pravatar.cc/150?u=julie",
+            },
+            {
+                "id": "demo-user-9",
+                "username": "GymRat_Antoine",
+                "email": "gymrat.antoine@demo.local",
+                "bio": "6x/semaine à la salle 💪 | Bodybuilding naturel",
+                "objective": "Hypertrophie",
+                "avatar_url": "https://i.pravatar.cc/150?u=antoine",
+            },
+            {
+                "id": "demo-user-10",
+                "username": "Strong_Léa",
+                "email": "strong.lea@demo.local",
+                "bio": "Haltérophilie & Crossfit 🏆 | Bordeaux | Comp Level",
+                "objective": "Force",
+                "avatar_url": "https://i.pravatar.cc/150?u=lea",
+            },
+            {
                 "id": "guest-user",
                 "username": "Moi",
                 "email": "guest@demo.local",
@@ -274,6 +330,114 @@ def seed_demo_data():
                     {"muscle": "triceps", "sets": 3, "reps": (12, 15), "weight": (20, 35)},
                 ],
             },
+            # Nouveaux utilisateurs
+            {
+                "owner_id": "demo-user-4",
+                "owner_username": "Iron_Sophie",
+                "title": "WOD Murph 🔥",
+                "hours_ago": 3,
+                "exercises": [
+                    {"muscle": "chest", "sets": 10, "reps": (10, 10), "weight": (0, 0)},
+                    {"muscle": "back", "sets": 10, "reps": (5, 5), "weight": (0, 0)},
+                    {"muscle": "quadriceps", "sets": 10, "reps": (15, 15), "weight": (0, 0)},
+                ],
+            },
+            {
+                "owner_id": "demo-user-5",
+                "owner_username": "Yoga_Lucas",
+                "title": "Renfo doux + Mobilité 🧘",
+                "hours_ago": 6,
+                "exercises": [
+                    {"muscle": "core", "sets": 3, "reps": (20, 30), "weight": (0, 5)},
+                    {"muscle": "glutes", "sets": 3, "reps": (15, 20), "weight": (0, 10)},
+                    {"muscle": "shoulders", "sets": 3, "reps": (12, 15), "weight": (3, 8)},
+                ],
+            },
+            {
+                "owner_id": "demo-user-6",
+                "owner_username": "RunnerPro_Emma",
+                "title": "Renfo Coureurs 🏃‍♀️",
+                "hours_ago": 12,
+                "exercises": [
+                    {"muscle": "quadriceps", "sets": 4, "reps": (15, 20), "weight": (30, 50)},
+                    {"muscle": "hamstrings", "sets": 4, "reps": (15, 20), "weight": (20, 40)},
+                    {"muscle": "calves", "sets": 4, "reps": (20, 25), "weight": (40, 60)},
+                    {"muscle": "core", "sets": 3, "reps": (20, 30), "weight": (0, 5)},
+                ],
+            },
+            {
+                "owner_id": "demo-user-7",
+                "owner_username": "BigLift_Max",
+                "title": "Deadlift Day 💀",
+                "hours_ago": 18,
+                "exercises": [
+                    {"muscle": "back", "sets": 5, "reps": (1, 3), "weight": (200, 250)},
+                    {"muscle": "back", "sets": 4, "reps": (5, 8), "weight": (140, 180)},
+                    {"muscle": "hamstrings", "sets": 4, "reps": (8, 10), "weight": (80, 120)},
+                    {"muscle": "back", "sets": 3, "reps": (10, 12), "weight": (60, 80)},
+                ],
+            },
+            {
+                "owner_id": "demo-user-8",
+                "owner_username": "Fitlife_Julie",
+                "title": "Full Body Brûle-Graisse 🔥",
+                "hours_ago": 20,
+                "exercises": [
+                    {"muscle": "chest", "sets": 3, "reps": (15, 20), "weight": (10, 20)},
+                    {"muscle": "back", "sets": 3, "reps": (15, 20), "weight": (20, 35)},
+                    {"muscle": "quadriceps", "sets": 3, "reps": (15, 20), "weight": (30, 50)},
+                    {"muscle": "glutes", "sets": 3, "reps": (15, 20), "weight": (20, 40)},
+                    {"muscle": "core", "sets": 3, "reps": (20, 30), "weight": (0, 5)},
+                ],
+            },
+            {
+                "owner_id": "demo-user-9",
+                "owner_username": "GymRat_Antoine",
+                "title": "Arms Day 💪",
+                "hours_ago": 30,
+                "exercises": [
+                    {"muscle": "biceps", "sets": 4, "reps": (10, 12), "weight": (14, 22)},
+                    {"muscle": "biceps", "sets": 4, "reps": (12, 15), "weight": (10, 16)},
+                    {"muscle": "triceps", "sets": 4, "reps": (10, 12), "weight": (25, 40)},
+                    {"muscle": "triceps", "sets": 4, "reps": (12, 15), "weight": (20, 35)},
+                    {"muscle": "forearms", "sets": 3, "reps": (15, 20), "weight": (15, 25)},
+                ],
+            },
+            {
+                "owner_id": "demo-user-10",
+                "owner_username": "Strong_Léa",
+                "title": "Snatch & Clean 🏋️",
+                "hours_ago": 36,
+                "exercises": [
+                    {"muscle": "quadriceps", "sets": 5, "reps": (2, 3), "weight": (70, 90)},
+                    {"muscle": "shoulders", "sets": 4, "reps": (5, 8), "weight": (40, 60)},
+                    {"muscle": "back", "sets": 4, "reps": (6, 8), "weight": (80, 110)},
+                    {"muscle": "core", "sets": 3, "reps": (15, 20), "weight": (10, 20)},
+                ],
+            },
+            {
+                "owner_id": "demo-user-4",
+                "owner_username": "Iron_Sophie",
+                "title": "AMRAP 20min ⏱️",
+                "hours_ago": 50,
+                "exercises": [
+                    {"muscle": "chest", "sets": 5, "reps": (15, 20), "weight": (0, 0)},
+                    {"muscle": "quadriceps", "sets": 5, "reps": (20, 25), "weight": (0, 0)},
+                    {"muscle": "back", "sets": 5, "reps": (10, 15), "weight": (0, 0)},
+                ],
+            },
+            {
+                "owner_id": "demo-user-7",
+                "owner_username": "BigLift_Max",
+                "title": "Squat PR Day 🔥",
+                "hours_ago": 72,
+                "exercises": [
+                    {"muscle": "quadriceps", "sets": 6, "reps": (1, 3), "weight": (180, 210)},
+                    {"muscle": "quadriceps", "sets": 4, "reps": (5, 8), "weight": (140, 170)},
+                    {"muscle": "glutes", "sets": 4, "reps": (8, 10), "weight": (100, 140)},
+                    {"muscle": "calves", "sets": 4, "reps": (12, 15), "weight": (80, 120)},
+                ],
+            },
         ]
         
         # Créer les séances et partages
@@ -308,13 +472,40 @@ def seed_demo_data():
         
         # Créer des relations de follow
         follow_relations = [
+            # Guest suit tout le monde
             ("guest-user", "demo-user-1"),
             ("guest-user", "demo-user-2"),
             ("guest-user", "demo-user-3"),
+            ("guest-user", "demo-user-4"),
+            ("guest-user", "demo-user-5"),
+            ("guest-user", "demo-user-6"),
+            ("guest-user", "demo-user-7"),
+            # Relations entre démo users
             ("demo-user-1", "demo-user-2"),
+            ("demo-user-1", "demo-user-4"),
+            ("demo-user-1", "demo-user-8"),
             ("demo-user-2", "demo-user-1"),
+            ("demo-user-2", "demo-user-7"),
             ("demo-user-3", "demo-user-1"),
             ("demo-user-3", "demo-user-2"),
+            ("demo-user-3", "demo-user-5"),
+            ("demo-user-4", "demo-user-1"),
+            ("demo-user-4", "demo-user-6"),
+            ("demo-user-4", "demo-user-10"),
+            ("demo-user-5", "demo-user-3"),
+            ("demo-user-5", "demo-user-8"),
+            ("demo-user-6", "demo-user-4"),
+            ("demo-user-6", "demo-user-5"),
+            ("demo-user-7", "demo-user-2"),
+            ("demo-user-7", "demo-user-9"),
+            ("demo-user-7", "demo-user-10"),
+            ("demo-user-8", "demo-user-1"),
+            ("demo-user-8", "demo-user-3"),
+            ("demo-user-8", "demo-user-5"),
+            ("demo-user-9", "demo-user-2"),
+            ("demo-user-9", "demo-user-7"),
+            ("demo-user-10", "demo-user-4"),
+            ("demo-user-10", "demo-user-7"),
         ]
         
         created_follows = 0
@@ -330,8 +521,133 @@ def seed_demo_data():
         
         session.commit()
         
+        # Créer des likes sur les partages
+        all_shares = session.exec(select(Share)).all()
+        all_user_ids = [u["id"] for u in users_data if u["id"] != "guest-user"]
+        
+        created_likes = 0
+        for share in all_shares:
+            # Chaque partage reçoit entre 2 et 8 likes aléatoires
+            num_likes = random.randint(2, 8)
+            likers = random.sample(all_user_ids, min(num_likes, len(all_user_ids)))
+            
+            # Éviter que le propriétaire se like lui-même
+            if share.owner_id in likers:
+                likers.remove(share.owner_id)
+            
+            for liker_id in likers:
+                # Vérifier si le like existe déjà
+                existing_like = session.exec(
+                    select(Like)
+                    .where(Like.share_id == share.share_id)
+                    .where(Like.user_id == liker_id)
+                ).first()
+                
+                if not existing_like:
+                    like = Like(
+                        share_id=share.share_id,
+                        user_id=liker_id,
+                        created_at=datetime.now(timezone.utc) - timedelta(hours=random.randint(0, 24)),
+                    )
+                    session.add(like)
+                    created_likes += 1
+        
+        session.commit()
+        
+        # Créer des notifications pour guest-user
+        notifications_data = [
+            {
+                "type": "like",
+                "actor_id": "demo-user-1",
+                "actor_username": "FitGirl_Marie",
+                "message": "a aimé ta séance",
+                "hours_ago": 1,
+            },
+            {
+                "type": "follow",
+                "actor_id": "demo-user-4",
+                "actor_username": "Iron_Sophie",
+                "message": "a commencé à te suivre",
+                "hours_ago": 2,
+            },
+            {
+                "type": "like",
+                "actor_id": "demo-user-7",
+                "actor_username": "BigLift_Max",
+                "message": "a aimé ta séance",
+                "hours_ago": 3,
+            },
+            {
+                "type": "comment",
+                "actor_id": "demo-user-2",
+                "actor_username": "MuscleBro_Tom",
+                "message": "a commenté : \"Belle perf ! 💪\"",
+                "hours_ago": 5,
+            },
+            {
+                "type": "follow",
+                "actor_id": "demo-user-8",
+                "actor_username": "Fitlife_Julie",
+                "message": "a commencé à te suivre",
+                "hours_ago": 8,
+            },
+            {
+                "type": "like",
+                "actor_id": "demo-user-3",
+                "actor_username": "Coach_Alex",
+                "message": "a aimé ta séance",
+                "hours_ago": 12,
+            },
+            {
+                "type": "mention",
+                "actor_id": "demo-user-5",
+                "actor_username": "Yoga_Lucas",
+                "message": "t'a mentionné dans un commentaire",
+                "hours_ago": 18,
+            },
+            {
+                "type": "like",
+                "actor_id": "demo-user-10",
+                "actor_username": "Strong_Léa",
+                "message": "a aimé ta séance",
+                "hours_ago": 24,
+            },
+            {
+                "type": "follow",
+                "actor_id": "demo-user-9",
+                "actor_username": "GymRat_Antoine",
+                "message": "a commencé à te suivre",
+                "hours_ago": 36,
+            },
+            {
+                "type": "comment",
+                "actor_id": "demo-user-6",
+                "actor_username": "RunnerPro_Emma",
+                "message": "a commenté : \"On s'entraîne ensemble bientôt ? 🏃\"",
+                "hours_ago": 48,
+            },
+        ]
+        
+        created_notifications = 0
+        for notif_data in notifications_data:
+            notif = Notification(
+                user_id="guest-user",
+                type=notif_data["type"],
+                actor_id=notif_data["actor_id"],
+                actor_username=notif_data["actor_username"],
+                message=notif_data["message"],
+                read=notif_data["hours_ago"] > 12,  # Les vieilles notifs sont lues
+                created_at=datetime.now(timezone.utc) - timedelta(hours=notif_data["hours_ago"]),
+            )
+            session.add(notif)
+            created_notifications += 1
+        
+        session.commit()
+        
         print(f"\n✅ {created_shares} séances de démo créées avec de vrais exercices!")
         print(f"✅ {created_follows} relations de follow créées!")
+        print(f"✅ {created_likes} likes créés!")
+        print(f"✅ {created_notifications} notifications créées!")
         print("🔄 Rafraîchis la page feed pour voir les données.")
 
 

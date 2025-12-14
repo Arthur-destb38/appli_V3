@@ -37,6 +37,9 @@ class UserProfileCreate(UserProfileBase):
 
 class UserProfileRead(UserProfileBase):
     created_at: datetime
+    bio: Optional[str] = None
+    objective: Optional[str] = None
+    avatar_url: Optional[str] = None
 
     model_config = ConfigDict(from_attributes=True)
 

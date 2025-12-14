@@ -44,7 +44,7 @@ export default function ProfileScreen() {
   const menuItems = [
     { label: 'Mon profil public', route: '/profile/guest-user', icon: 'person-outline' as const },
     { label: 'Historique', route: '/history', icon: 'time-outline' as const },
-    { label: 'Programmes', route: '/programs', icon: 'calendar-outline' as const },
+    { label: 'Mon Programme', route: '/programme', icon: 'calendar-outline' as const },
     { label: 'Classement', route: '/leaderboard', icon: 'trophy-outline' as const },
     { label: 'Notifications', route: '/notifications', icon: 'notifications-outline' as const },
   ];

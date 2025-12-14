@@ -386,18 +386,6 @@ install_api() {
     
     cd "$SCRIPT_DIR/api"
     
-    # Créer le fichier .env avec l'URL des exercices si absent
-    if [ ! -f ".env" ]; then
-        log_info "Création du fichier .env avec configuration par défaut..."
-        echo "EXERCISES_URL=https://drive.google.com/file/d/1tK7OdUg96GSYgNPO08bukqb-gZOmxpHY/view?usp=sharing" > .env
-        log_success "Fichier .env créé"
-    fi
-    
-    # Charger les variables d'environnement
-    if [ -f ".env" ]; then
-        export $(cat .env | grep -v '^#' | xargs) 2>/dev/null || true
-    fi
-    
     # Déterminer le chemin selon l'OS
     if [ "$OS" = "Windows" ]; then
         VENV_ACTIVATE=".venv/Scripts/activate"
@@ -585,18 +573,6 @@ start_api() {
         if curl -s "http://localhost:8000/health" &>/dev/null; then
             log_success "API démarrée avec succès !"
             log_info "  → Swagger UI: http://$LOCAL_IP:8000/docs"
-            
-            # Seeder les données de démo si le script existe
-            if [ -f "scripts/seed_demo.py" ]; then
-                log_info "Chargement des données de démo..."
-                if [ "$OS" = "Windows" ]; then
-                    PYTHONPATH=. .venv/Scripts/python scripts/seed_demo.py 2>/dev/null || true
-                else
-                    PYTHONPATH=. .venv/bin/python scripts/seed_demo.py 2>/dev/null || true
-                fi
-                log_success "Données de démo chargées !"
-            fi
-            
             cd "$SCRIPT_DIR"
             return 0
         fi

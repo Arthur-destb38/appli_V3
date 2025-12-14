@@ -218,6 +218,14 @@ export default function LeaderboardScreen() {
         <View style={{ width: 28 }} />
       </View>
 
+      {/* Description */}
+      <View style={[styles.descriptionCard, { backgroundColor: theme.colors.surfaceMuted, borderColor: theme.colors.border }]}>
+        <Ionicons name="information-circle-outline" size={20} color={theme.colors.accent} style={{ marginRight: 10 }} />
+        <Text style={[styles.descriptionText, { color: theme.colors.textSecondary }]}>
+          Compare tes performances avec la communauté ! Filtre par catégorie et période pour voir où tu te situes.
+        </Text>
+      </View>
+
       {/* Tabs */}
       <View style={styles.tabsContainer}>
         {TABS.map((tab) => (
@@ -357,6 +365,20 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: 22,
     fontWeight: '800',
+  },
+  descriptionCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginHorizontal: 16,
+    marginBottom: 12,
+    padding: 12,
+    borderRadius: 12,
+    borderWidth: 1,
+  },
+  descriptionText: {
+    flex: 1,
+    fontSize: 13,
+    lineHeight: 18,
   },
   tabsContainer: {
     flexDirection: 'row',
