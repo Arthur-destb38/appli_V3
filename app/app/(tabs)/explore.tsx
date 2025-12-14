@@ -40,10 +40,18 @@ const CATEGORIES = [
 ];
 
 const CHALLENGES = [
-  { id: '1', title: '100 pompes', desc: '100 pompes en 1 jour', participants: 234, icon: '💪', gradient: ['#f093fb', '#f5576c'] },
-  { id: '2', title: 'Défi 7 jours', desc: '7 séances en 7 jours', participants: 156, icon: '🔥', gradient: ['#667eea', '#764ba2'] },
-  { id: '3', title: 'PR Squad', desc: 'Bats ton PR squat', participants: 89, icon: '🏆', gradient: ['#4facfe', '#00f2fe'] },
+  { id: '1', title: '100 pompes', desc: '100 pompes en 1 jour', participants: 234, icon: '💪', gradient: ['#f093fb', '#f5576c'], category: 'force' },
+  { id: '2', title: 'Défi 7 jours', desc: '7 séances en 7 jours', participants: 156, icon: '🔥', gradient: ['#667eea', '#764ba2'], category: 'all' },
+  { id: '3', title: 'PR Squad', desc: 'Bats ton PR squat', participants: 89, icon: '🏆', gradient: ['#4facfe', '#00f2fe'], category: 'force' },
 ];
+
+// Mapping catégories vers mots-clés dans les titres
+const CATEGORY_KEYWORDS: Record<string, string[]> = {
+  force: ['force', 'squat', 'deadlift', 'bench', 'pr', 'heavy', 'powerlifting', 'chest', 'back', 'leg'],
+  cardio: ['cardio', 'hiit', 'run', 'course', 'endurance', 'interval', 'conditioning'],
+  hypertrophie: ['hypertrophie', 'masse', 'volume', 'pump', 'bro', 'split', 'arms', 'biceps'],
+  perte: ['perte', 'cut', 'lean', 'burn', 'fat', 'circuit', 'full body', 'express'],
+};
 
 export default function ExploreScreen() {
   const router = useRouter();
@@ -117,6 +125,23 @@ export default function ExploreScreen() {
     setSelectedCategory(catId);
   };
 
+  const handleChallengePress = (challenge: typeof CHALLENGES[0]) => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
+    router.push(`/challenge/${challenge.id}` as never);
+  };
+
+  // Filtrer les posts par catégorie
+  const filteredPosts = React.useMemo(() => {
+    if (!data?.trending_posts) return [];
+    if (selectedCategory === 'all') return data.trending_posts;
+    
+    const keywords = CATEGORY_KEYWORDS[selectedCategory] || [];
+    return data.trending_posts.filter((post) => {
+      const title = post.workout_title.toLowerCase();
+      return keywords.some((kw) => title.includes(kw));
+    });
+  }, [data?.trending_posts, selectedCategory]);
+
   const renderCategoryChip = (cat: typeof CATEGORIES[0]) => {
     const isSelected = selectedCategory === cat.id;
     return (
@@ -148,7 +173,12 @@ export default function ExploreScreen() {
   };
 
   const renderChallengeCard = (challenge: typeof CHALLENGES[0]) => (
-    <TouchableOpacity key={challenge.id} style={styles.challengeCard}>
+    <TouchableOpacity 
+      key={challenge.id} 
+      style={styles.challengeCard}
+      onPress={() => handleChallengePress(challenge)}
+      activeOpacity={0.8}
+    >
       <LinearGradient
         colors={challenge.gradient as [string, string]}
         start={{ x: 0, y: 0 }}
@@ -416,15 +446,28 @@ export default function ExploreScreen() {
             </View>
           )}
 
-          {/* Posts trending */}
-          {data?.trending_posts && data.trending_posts.length > 0 && (
+          {/* Posts trending (filtrés par catégorie) */}
+          {filteredPosts.length > 0 ? (
             <View style={styles.section}>
               <Text style={[styles.sectionTitle, { color: theme.colors.textPrimary, paddingHorizontal: 16 }]}>
-                🔥 Tendances
+                {selectedCategory === 'all' ? '🔥 Tendances' : `🔥 ${CATEGORIES.find(c => c.id === selectedCategory)?.label || 'Tendances'}`}
               </Text>
               <View style={styles.postsGrid}>
-                {data.trending_posts.map((post, i) => renderPostCard(post, i))}
+                {filteredPosts.map((post, i) => renderPostCard(post, i))}
               </View>
+            </View>
+          ) : selectedCategory !== 'all' && (
+            <View style={styles.noResultsCategory}>
+              <Ionicons name="search-outline" size={40} color={theme.colors.textSecondary} />
+              <Text style={[styles.noResultsCategoryText, { color: theme.colors.textSecondary }]}>
+                Aucune séance "{CATEGORIES.find(c => c.id === selectedCategory)?.label}" pour le moment
+              </Text>
+              <TouchableOpacity 
+                style={[styles.resetFilterBtn, { backgroundColor: theme.colors.accent }]}
+                onPress={() => setSelectedCategory('all')}
+              >
+                <Text style={styles.resetFilterBtnText}>Voir tout</Text>
+              </TouchableOpacity>
             </View>
           )}
 
@@ -720,6 +763,27 @@ const styles = StyleSheet.create({
   },
   noResultsText: {
     fontSize: 14,
+  },
+  noResultsCategory: {
+    alignItems: 'center',
+    paddingVertical: 40,
+    paddingHorizontal: 32,
+    gap: 12,
+  },
+  noResultsCategoryText: {
+    fontSize: 15,
+    textAlign: 'center',
+  },
+  resetFilterBtn: {
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    borderRadius: 10,
+    marginTop: 8,
+  },
+  resetFilterBtnText: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: '600',
   },
   emptyState: {
     alignItems: 'center',

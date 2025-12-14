@@ -73,6 +73,10 @@ export default function RootLayout() {
                   options={{ title: 'Classement', headerShown: true, headerBackTitle: 'Retour' }}
                 />
                 <Stack.Screen
+                  name="challenge/[id]"
+                  options={{ title: 'Défi', headerShown: false }}
+                />
+                <Stack.Screen
                   name="modal"
                   options={{ presentation: 'modal', title: 'Modal' }}
                 />
