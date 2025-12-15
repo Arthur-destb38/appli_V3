@@ -6,7 +6,7 @@ from datetime import datetime, timezone, timedelta
 from sqlalchemy import text
 from sqlmodel import Session, select
 from src.api.db import get_engine
-from src.api.models import User, Share, Follower, Workout, WorkoutExercise, Set, Exercise, Like, Notification
+from src.api.models import User, Share, Follower, Workout, WorkoutExercise, Set, Exercise, Like, Notification, Comment
 
 
 def get_exercises_by_muscle(session: Session) -> dict:
@@ -554,6 +554,61 @@ def seed_demo_data():
         
         session.commit()
         
+        # Créer des commentaires sur les partages
+        comment_templates = [
+            "Super séance ! 💪",
+            "Bien joué, continue comme ça !",
+            "Impressionnant ! 🔥",
+            "T'es une machine 💪💪",
+            "Ça c'est du lourd !",
+            "GG pour cette perf !",
+            "Inspirant ! Je m'y mets demain",
+            "Belle progression depuis la dernière fois",
+            "Les gains arrivent 📈",
+            "Respect ! 🙌",
+            "On se motive mutuellement 💪",
+            "C'est ça l'esprit !",
+            "Bravo pour ta régularité",
+            "Quelle intensité !",
+            "Tu gères ! 🏆",
+        ]
+        
+        user_comments_map = {
+            "demo-user-1": "FitGirl_Marie",
+            "demo-user-2": "MuscleBro_Tom", 
+            "demo-user-3": "Coach_Alex",
+            "demo-user-4": "Iron_Sophie",
+            "demo-user-5": "Yoga_Lucas",
+            "demo-user-6": "RunnerPro_Emma",
+            "demo-user-7": "BigLift_Max",
+            "demo-user-8": "Fitlife_Julie",
+            "demo-user-9": "GymRat_Antoine",
+            "demo-user-10": "Strong_Léa",
+        }
+        
+        created_comments = 0
+        for share in all_shares:
+            # Chaque partage reçoit entre 1 et 5 commentaires
+            num_comments = random.randint(1, 5)
+            commenters = random.sample(list(user_comments_map.keys()), min(num_comments, len(user_comments_map)))
+            
+            # Éviter que le propriétaire se commente lui-même
+            if share.owner_id in commenters:
+                commenters.remove(share.owner_id)
+            
+            for idx, commenter_id in enumerate(commenters):
+                comment = Comment(
+                    share_id=share.share_id,
+                    user_id=commenter_id,
+                    username=user_comments_map[commenter_id],
+                    content=random.choice(comment_templates),
+                    created_at=datetime.now(timezone.utc) - timedelta(hours=random.randint(0, 48), minutes=random.randint(0, 59)),
+                )
+                session.add(comment)
+                created_comments += 1
+        
+        session.commit()
+        
         # Créer des notifications pour guest-user
         notifications_data = [
             {
@@ -647,6 +702,7 @@ def seed_demo_data():
         print(f"\n✅ {created_shares} séances de démo créées avec de vrais exercices!")
         print(f"✅ {created_follows} relations de follow créées!")
         print(f"✅ {created_likes} likes créés!")
+        print(f"✅ {created_comments} commentaires créés!")
         print(f"✅ {created_notifications} notifications créées!")
         print("🔄 Rafraîchis la page feed pour voir les données.")
 

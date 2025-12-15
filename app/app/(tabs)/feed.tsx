@@ -217,15 +217,6 @@ const FeedScreen: React.FC = () => {
         </View>
       </View>
 
-      {/* Stories */}
-      {loadingStories ? (
-        <View style={styles.storyLoader}>
-          <ActivityIndicator />
-        </View>
-      ) : (
-        <StoriesCarousel stories={stories} onOpen={openStory} />
-      )}
-
       {/* Feed */}
       {isLoading && !items.length ? (
         <View style={styles.centered}>
@@ -322,55 +313,90 @@ const FeedScreen: React.FC = () => {
       <Modal
         visible={commentsModal.visible}
         animationType="slide"
+        transparent={true}
         onRequestClose={() => setCommentsModal((prev) => ({ ...prev, visible: false }))}
       >
+        <TouchableWithoutFeedback onPress={() => setCommentsModal((prev) => ({ ...prev, visible: false }))}>
+          <View style={styles.commentsOverlay} />
+        </TouchableWithoutFeedback>
         <KeyboardAvoidingView
           behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
           style={[styles.commentsModal, { backgroundColor: theme.colors.background }]}
         >
+          {/* Drag indicator */}
+          <View style={styles.dragIndicatorContainer}>
+            <View style={[styles.dragIndicator, { backgroundColor: theme.colors.border }]} />
+          </View>
+
           {/* Comments Header */}
           <View style={[styles.commentsHeader, { borderColor: theme.colors.border }]}>
+            <View style={{ width: 28 }} />
             <Text style={[styles.commentsTitle, { color: theme.colors.textPrimary }]}>
               Commentaires
             </Text>
             <TouchableOpacity
               onPress={() => setCommentsModal((prev) => ({ ...prev, visible: false }))}
+              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
             >
-              <Ionicons name="close" size={28} color={theme.colors.textPrimary} />
+              <Ionicons name="close-circle" size={28} color={theme.colors.textSecondary} />
             </TouchableOpacity>
           </View>
 
           {/* Comments List */}
           {commentsModal.loading ? (
             <View style={styles.centered}>
-              <ActivityIndicator />
+              <ActivityIndicator size="large" color={theme.colors.accent} />
+              <Text style={[styles.loadingText, { color: theme.colors.textSecondary, marginTop: 12 }]}>
+                Chargement...
+              </Text>
             </View>
           ) : commentsModal.comments.length === 0 ? (
             <View style={styles.noComments}>
+              <View style={[styles.noCommentsIcon, { backgroundColor: theme.colors.surfaceMuted }]}>
+                <Ionicons name="chatbubble-outline" size={48} color={theme.colors.textSecondary} />
+              </View>
+              <Text style={[styles.noCommentsTitle, { color: theme.colors.textPrimary }]}>
+                Pas encore de commentaires
+              </Text>
               <Text style={[styles.noCommentsText, { color: theme.colors.textSecondary }]}>
-                Aucun commentaire. Sois le premier !
+                Sois le premier à commenter cette séance !
               </Text>
             </View>
           ) : (
             <FlatList
               data={commentsModal.comments}
               keyExtractor={(item) => String(item.id)}
-              contentContainerStyle={{ padding: 16 }}
+              contentContainerStyle={{ padding: 16, paddingBottom: 100 }}
+              showsVerticalScrollIndicator={false}
               renderItem={({ item }) => (
                 <View style={styles.commentItem}>
-                  <View style={[styles.commentAvatar, { backgroundColor: theme.colors.surfaceMuted }]}>
-                    <Text style={[styles.commentAvatarText, { color: theme.colors.textPrimary }]}>
-                      {item.username.slice(0, 2).toUpperCase()}
+                  <View style={[styles.commentAvatar, { backgroundColor: theme.colors.accent + '30' }]}>
+                    <Text style={[styles.commentAvatarText, { color: theme.colors.accent }]}>
+                      {item.username.slice(0, 1).toUpperCase()}
                     </Text>
                   </View>
                   <View style={styles.commentContent}>
-                    <Text style={{ color: theme.colors.textPrimary }}>
-                      <Text style={styles.commentUsername}>{item.username}</Text>
-                      {' '}{item.content}
-                    </Text>
-                    <Text style={[styles.commentDate, { color: theme.colors.textSecondary }]}>
-                      {new Date(item.created_at).toLocaleDateString('fr-FR')}
-                    </Text>
+                    <View style={styles.commentBubble}>
+                      <Text style={[styles.commentUsername, { color: theme.colors.textPrimary }]}>
+                        {item.username}
+                      </Text>
+                      <Text style={[styles.commentText, { color: theme.colors.textPrimary }]}>
+                        {item.content}
+                      </Text>
+                    </View>
+                    <View style={styles.commentMeta}>
+                      <Text style={[styles.commentDate, { color: theme.colors.textSecondary }]}>
+                        {new Date(item.created_at).toLocaleDateString('fr-FR', { 
+                          day: 'numeric', 
+                          month: 'short',
+                          hour: '2-digit',
+                          minute: '2-digit'
+                        })}
+                      </Text>
+                      <TouchableOpacity style={styles.commentLikeBtn}>
+                        <Ionicons name="heart-outline" size={14} color={theme.colors.textSecondary} />
+                      </TouchableOpacity>
+                    </View>
                   </View>
                 </View>
               )}
@@ -378,24 +404,40 @@ const FeedScreen: React.FC = () => {
           )}
 
           {/* Comment Input */}
-          <View style={[styles.commentInputContainer, { borderColor: theme.colors.border, backgroundColor: theme.colors.surface }]}>
-            <TextInput
-              style={[styles.commentInput, { color: theme.colors.textPrimary }]}
-              placeholder="Ajouter un commentaire..."
-              placeholderTextColor={theme.colors.textSecondary}
-              value={newComment}
-              onChangeText={setNewComment}
-              multiline
-            />
+          <View style={[styles.commentInputContainer, { 
+            borderColor: theme.colors.border, 
+            backgroundColor: theme.colors.surface,
+            shadowColor: '#000',
+            shadowOffset: { width: 0, height: -2 },
+            shadowOpacity: 0.1,
+            shadowRadius: 8,
+          }]}>
+            <View style={[styles.inputWrapper, { backgroundColor: theme.colors.surfaceMuted }]}>
+              <TextInput
+                style={[styles.commentInput, { color: theme.colors.textPrimary }]}
+                placeholder="Ajouter un commentaire..."
+                placeholderTextColor={theme.colors.textSecondary}
+                value={newComment}
+                onChangeText={setNewComment}
+                multiline
+                maxLength={500}
+              />
+            </View>
             <TouchableOpacity
               onPress={handlePostComment}
               disabled={!newComment.trim() || postingComment}
-              style={{ opacity: newComment.trim() ? 1 : 0.5 }}
+              style={[
+                styles.sendButton, 
+                { 
+                  backgroundColor: newComment.trim() ? theme.colors.accent : theme.colors.surfaceMuted,
+                  opacity: newComment.trim() ? 1 : 0.5 
+                }
+              ]}
             >
               {postingComment ? (
-                <ActivityIndicator size="small" color={theme.colors.accent} />
+                <ActivityIndicator size="small" color="#fff" />
               ) : (
-                <Text style={[styles.postButton, { color: theme.colors.accent }]}>Publier</Text>
+                <Ionicons name="send" size={18} color={newComment.trim() ? '#fff' : theme.colors.textSecondary} />
               )}
             </TouchableOpacity>
           </View>
@@ -519,65 +561,137 @@ const styles = StyleSheet.create({
     fontSize: 15,
   },
   // Comments Modal
+  commentsOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+  },
   commentsModal: {
     flex: 1,
+    marginTop: 100,
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    overflow: 'hidden',
+  },
+  dragIndicatorContainer: {
+    alignItems: 'center',
+    paddingVertical: 12,
+  },
+  dragIndicator: {
+    width: 40,
+    height: 4,
+    borderRadius: 2,
   },
   commentsHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    padding: 16,
+    paddingHorizontal: 16,
+    paddingBottom: 16,
     borderBottomWidth: StyleSheet.hairlineWidth,
   },
   commentsTitle: {
     fontSize: 18,
     fontWeight: '700',
+    textAlign: 'center',
   },
   noComments: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
+    padding: 32,
+  },
+  noCommentsIcon: {
+    width: 100,
+    height: 100,
+    borderRadius: 50,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 20,
+  },
+  noCommentsTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    marginBottom: 8,
   },
   noCommentsText: {
     fontSize: 14,
+    textAlign: 'center',
   },
   commentItem: {
     flexDirection: 'row',
     gap: 12,
-    marginBottom: 16,
+    marginBottom: 20,
   },
   commentAvatar: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
     alignItems: 'center',
     justifyContent: 'center',
   },
   commentAvatarText: {
-    fontSize: 12,
-    fontWeight: '600',
+    fontSize: 16,
+    fontWeight: '700',
   },
   commentContent: {
     flex: 1,
+    gap: 6,
+  },
+  commentBubble: {
     gap: 4,
   },
   commentUsername: {
     fontWeight: '700',
+    fontSize: 14,
+  },
+  commentText: {
+    fontSize: 14,
+    lineHeight: 20,
+  },
+  commentMeta: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 16,
   },
   commentDate: {
     fontSize: 12,
   },
+  commentLikeBtn: {
+    padding: 4,
+  },
   commentInputContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: 12,
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    padding: 16,
+    paddingBottom: 32,
     gap: 12,
     borderTopWidth: StyleSheet.hairlineWidth,
   },
-  commentInput: {
+  inputWrapper: {
     flex: 1,
+    borderRadius: 24,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+  },
+  commentInput: {
     fontSize: 15,
-    maxHeight: 80,
+    maxHeight: 100,
+    minHeight: 20,
+  },
+  sendButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   postButton: {
     fontWeight: '700',
