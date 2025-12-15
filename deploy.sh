@@ -573,6 +573,16 @@ start_api() {
         if curl -s "http://localhost:8000/health" &>/dev/null; then
             log_success "API démarrée avec succès !"
             log_info "  → Swagger UI: http://$LOCAL_IP:8000/docs"
+            
+            # Lancer le seed des données de démo
+            log_info "Chargement des données de démo..."
+            if [ "$OS" = "Windows" ]; then
+                PYTHONPATH=. .venv/Scripts/python scripts/seed_demo.py 2>/dev/null || log_warning "Seed déjà effectué ou erreur"
+            else
+                PYTHONPATH=. .venv/bin/python scripts/seed_demo.py 2>/dev/null || log_warning "Seed déjà effectué ou erreur"
+            fi
+            log_success "Données de démo chargées !"
+            
             cd "$SCRIPT_DIR"
             return 0
         fi
