@@ -6,7 +6,7 @@ export interface LikeResponse {
 }
 
 export interface Comment {
-  id: number;
+  id: string;
   user_id: string;
   username: string;
   content: string;
@@ -125,7 +125,7 @@ export async function getComments(shareId: string, limit = 20): Promise<Comments
 /**
  * Supprimer un commentaire
  */
-export async function deleteComment(shareId: string, commentId: number, userId: string): Promise<void> {
+export async function deleteComment(shareId: string, commentId: string, userId: string): Promise<void> {
   const baseUrl = getApiBaseUrl();
   const headers = await getAuthHeaders();
 

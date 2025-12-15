@@ -25,7 +25,7 @@ class CommentRequest(BaseModel):
 
 
 class CommentResponse(BaseModel):
-    id: int
+    id: str
     user_id: str
     username: str
     content: str
