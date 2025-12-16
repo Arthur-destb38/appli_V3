@@ -1,135 +1,172 @@
-# 🦍 Gorillax V2 — Application de Fitness
+# Gorillax
 
-Application mobile (Expo/React Native) + API FastAPI pour créer, suivre et partager des séances d'entraînement.
+Application mobile de fitness avec fonctionnalités sociales. L'idée : combiner le suivi d'entraînement avec un réseau social pour garder la motivation.
+
+**Projet M2 MoSEF** — Arthur Destribats & Niama El Kamal — Paris 1, Décembre 2025
 
 ---
 
-## 🚀 Déploiement rapide (1 commande)
+## Le projet en bref
+
+80% des gens abandonnent la salle après 3 mois. Pourquoi ? Pas de suivi, pas de motivation, personne pour te pousser. 
+
+Gorillax essaie de résoudre ça en mélangeant deux trucs :
+- Une app de tracking classique (séances, exercices, progression)
+- Un feed social à la Instagram où tu partages tes séances
+
+En gros, c'est un peu le Strava de la muscu.
+
+---
+
+## Lancer le projet
+
+### Ce qu'il te faut
+
+- Python 3.10 ou plus
+- Node.js 20
+- pnpm (`npm install -g pnpm` si t'as pas)
+- L'app Expo Go sur ton tel
+
+### Installation
 
 ```bash
 git clone https://github.com/Arthur-destb38/Appli_V2.git
-cd Appli_V2
+cd Appli_V2/V2
 ./deploy.sh
 ```
 
-**C'est tout !** Le script s'occupe de tout :
-- ✅ Détecte votre OS (Mac/Linux/Windows)
-- ✅ Vérifie les prérequis (Python, Node, pnpm)
-- ✅ Installe les dépendances
-- ✅ Lance l'API + l'app mobile
+Le script fait tout : il installe les dépendances, lance l'API, charge les données de démo, et démarre l'app. À la fin tu scannes le QR code avec Expo Go et c'est bon.
 
-### Options du script
+> Le tel et l'ordi doivent être sur le même WiFi.
+
+### Options utiles
 
 ```bash
-./deploy.sh              # Installation complète + lancement
-./deploy.sh --install    # Installation uniquement (sans lancer)
-./deploy.sh --api-only   # Lance seulement l'API locale
-./deploy.sh --app-only   # Lance seulement l'app mobile
-./deploy.sh --tunnel     # Lance avec tunnel public (accessible partout)
-./deploy.sh --help       # Affiche l'aide
+./deploy.sh --api-only   # Juste l'API
+./deploy.sh --app-only   # Juste l'app (utilise l'API cloud)
+./deploy.sh --tunnel     # Si le QR code marche pas, ça passe par internet
 ```
 
 ---
 
-## 🌐 API Cloud (Production)
+## Comment c'est construit
 
-L'API est déployée sur Render et accessible 24/7 :
+**Frontend** : React Native avec Expo. On utilise TypeScript pour éviter les bugs débiles. La navigation c'est Expo Router (file-based). Pour le offline, y'a une base SQLite locale qui sync avec le serveur.
 
-| Service | URL |
-|---------|-----|
-| **API** | https://appli-v2.onrender.com |
-| **Documentation Swagger** | https://appli-v2.onrender.com/docs |
-| **Health Check** | https://appli-v2.onrender.com/health |
+**Backend** : FastAPI en Python. C'est rapide, ça génère la doc Swagger automatiquement, et c'est agréable à coder. La BDD c'est SQLite avec SQLModel comme ORM.
 
-> ⚠️ **Note** : Le plan gratuit Render met l'API en veille après 15 min d'inactivité. Le premier appel peut prendre ~30 secondes.
-
----
-
-## 📋 Prérequis
-
-| Outil | Version | Installation |
-|-------|---------|--------------|
-| **Python** | 3.10+ | [python.org](https://python.org) |
-| **Node.js** | 20 LTS | [nodejs.org](https://nodejs.org) |
-| **pnpm** | 8+ | `npm install -g pnpm` |
-
-> **Note** : Le script `deploy.sh` vérifie automatiquement ces prérequis et installe pnpm si nécessaire.
-
----
-
-## 📁 Structure du projet
+**Déploiement** : L'API tourne sur Render (gratuit). Le code est sur GitHub. Les exercices sont chargés depuis un JSON sur Google Drive.
 
 ```
-Appli_V2/
-├── deploy.sh          # 🚀 Script de déploiement automatisé
-├── api/               # 🐍 API FastAPI (Python)
-│   ├── src/api/       # Code source de l'API
-│   ├── scripts/       # Scripts utilitaires (seed, reset)
-│   ├── migrations/    # Migrations Alembic
-│   ├── requirements.txt  # Dépendances Python
-│   └── render.yaml    # Configuration Render (cloud)
-├── app/               # 📱 App Mobile (Expo/React Native)
-│   ├── app/           # Écrans et navigation (Expo Router)
-│   ├── src/           # Composants, hooks, services
-│   ├── app.json       # Configuration Expo
-│   └── eas.json       # Configuration EAS Build
-└── docs/              # 📚 Documentation
+Frontend (React Native)
+        ↓
+    REST API
+        ↓
+Backend (FastAPI)
+        ↓
+    SQLite
 ```
 
 ---
 
-## 📱 Tester l'application
+## Ce que ça fait
 
-### Option 1 : Expo Go (Développement)
+### Côté fitness
 
+- Création de programmes (PPL, Full Body, etc.)
+- Base de 130+ exercices
+- Suivi des séances en temps réel (poids, reps, temps de repos)
+- Historique et graphiques de progression
+- Tout marche offline, ça sync quand t'as du réseau
+
+### Côté social
+
+- Feed avec les séances des autres
+- Likes et commentaires
+- Profils avec stats, bio, avatar
+- Système de followers
+- Classements (qui a fait le plus de volume, etc.)
+- Notifications
+
+---
+
+## L'API
+
+En prod : https://appli-v2.onrender.com
+
+La doc Swagger est là : https://appli-v2.onrender.com/docs
+
+Quelques endpoints :
+
+```
+POST /auth/register     - Créer un compte
+POST /auth/login        - Se connecter
+GET  /exercises         - Liste des exercices
+GET  /feed              - Le feed social
+POST /likes/{id}        - Liker un post
+GET  /profile/{id}      - Voir un profil
+GET  /leaderboard/volume - Classement par volume
+```
+
+Pour tester :
 ```bash
-./deploy.sh --app-only
+curl https://appli-v2.onrender.com/health
+curl "https://appli-v2.onrender.com/feed?user_id=guest-user&limit=5"
 ```
 
-Puis scannez le QR code avec l'app **Expo Go** sur votre téléphone.
-
-### Option 2 : APK Android (Production)
-
-```bash
-cd app
-npx eas-cli build -p android --profile preview --non-interactive
-```
-
-L'APK sera disponible sur [expo.dev](https://expo.dev) après le build (~10 min).
+> L'API sur Render se met en veille après 15 min d'inactivité. Le premier appel peut prendre 30 secondes.
 
 ---
 
-## 🔧 Installation manuelle (alternative)
+## Structure des dossiers
 
-### 1) API FastAPI
+```
+V2/
+├── deploy.sh           # Le script qui fait tout
+├── api/                # Le backend Python
+│   ├── src/api/        # Code source (routes, models, etc.)
+│   └── scripts/        # Scripts utilitaires
+└── app/                # L'app React Native
+    ├── app/            # Les écrans (Expo Router)
+    └── src/            # Composants, hooks, services
+```
 
+---
+
+## Réponse aux consignes
+
+On devait faire une app mobile avec API. Voilà ce qu'on a fait :
+
+- **App fonctionnelle** : Oui, y'a 20+ écrans, ça marche sur iOS/Android/Web
+- **API REST** : FastAPI avec tous les endpoints documentés
+- **Base de données** : SQLite côté serveur et côté client
+- **Auth** : JWT tokens
+- **Mode offline** : SQLite local + sync
+- **Déploiement** : Script bash automatisé + API sur Render
+- **Données de démo** : 10 utilisateurs fictifs avec des séances, likes, commentaires
+
+On est allés plus loin que le minimum en ajoutant tout le côté social (feed, likes, commentaires, followers, classements).
+
+---
+
+## Si ça marche pas
+
+**Port occupé** : `lsof -ti:8000 | xargs kill -9`
+
+**L'app se connecte pas** : Vérifie que t'es sur le même WiFi
+
+**QR code marche pas** : Essaie `./deploy.sh --tunnel`
+
+**Erreur pnpm** : `npm install -g pnpm`
+
+Pour relancer juste l'API :
 ```bash
 cd api
-python3 -m venv .venv
-.venv/bin/pip install --upgrade pip
-.venv/bin/pip install -r requirements.txt
+source .venv/bin/activate
+uvicorn src.api.main:app --reload --port 8000
 ```
 
-### 2) App Expo
-
-```bash
-cd app
-pnpm install
-```
-
----
-
-## ▶️ Lancement manuel
-
-### API locale (Terminal 1)
-
-```bash
-cd api
-.venv/bin/uvicorn src.api.main:app --host 0.0.0.0 --port 8000
-```
-
-### App Mobile (Terminal 2)
-
+Pour relancer juste l'app :
 ```bash
 cd app
 pnpm start
@@ -137,103 +174,12 @@ pnpm start
 
 ---
 
-## 🔐 Endpoints API
+## Liens
 
-### Authentification
-
-| Route | Méthode | Description |
-|-------|---------|-------------|
-| `/auth/register` | POST | Inscription `{username, password}` |
-| `/auth/login` | POST | Connexion `{username, password}` |
-| `/auth/me` | GET | Profil utilisateur (Bearer token) |
-
-### Exercices
-
-| Route | Méthode | Description |
-|-------|---------|-------------|
-| `/exercises` | GET | Liste tous les exercices |
-| `/exercises/{id}` | GET | Détails d'un exercice |
-
-### Séances
-
-| Route | Méthode | Description |
-|-------|---------|-------------|
-| `/workouts` | GET | Liste des séances |
-| `/workouts` | POST | Créer une séance |
-| `/workouts/{id}` | GET | Détails d'une séance |
-
-**Exemple :**
-
-```bash
-# Test de l'API cloud
-curl https://appli-v2.onrender.com/health
-
-# Liste des exercices
-curl https://appli-v2.onrender.com/exercises
-```
+- API : https://appli-v2.onrender.com
+- Doc Swagger : https://appli-v2.onrender.com/docs
+- GitHub : https://github.com/Arthur-destb38/Appli_V2
 
 ---
 
-## 🐛 Dépannage
-
-| Problème | Solution |
-|----------|----------|
-| Port 8000 occupé | `lsof -i :8000` puis `kill <PID>` |
-| Port 8081 occupé | `lsof -i :8081` puis `kill <PID>` |
-| Expo erreur port | Utilisez Node 20 LTS |
-| pnpm non trouvé | `npm install -g pnpm` |
-| API lente au premier appel | Normal (plan gratuit Render, ~30s de réveil) |
-| App ne se connecte pas | Vérifiez le Wi-Fi (même réseau) |
-
----
-
-## 🛠️ Commandes utiles
-
-```bash
-# Lancer tout
-./deploy.sh
-
-# API seule (locale)
-./deploy.sh --api-only
-
-# App seule (connectée à l'API cloud)
-./deploy.sh --app-only
-
-# Vérifier l'API cloud
-curl https://appli-v2.onrender.com/health
-
-# Documentation Swagger
-open https://appli-v2.onrender.com/docs
-
-# Reset la base de données locale
-cd api && .venv/bin/python scripts/reset_db.py
-
-# Build APK
-cd app && npx eas-cli build -p android --profile preview
-```
-
----
-
-## 📚 Documentation
-
-- [Documentation Swagger](https://appli-v2.onrender.com/docs)
-- [Roadmap du projet](docs/Roadmap.md)
-- [Architecture](docs/arborescence.md)
-
----
-
-## 🎯 Fonctionnalités
-
-- ✅ Création de séances d'entraînement
-- ✅ Bibliothèque de 15+ exercices
-- ✅ Suivi des performances
-- ✅ Historique des séances
-- ✅ Mode hors-ligne (SQLite local)
-- ✅ Synchronisation avec l'API cloud
-- ✅ Interface moderne et responsive
-
----
-
-## 📄 Licence
-
-Projet personnel - Gorillax 🦍
+Projet M2 MoSEF — Paris 1 — 2025
