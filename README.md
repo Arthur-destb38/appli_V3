@@ -30,15 +30,15 @@ En gros, c'est un peu le Strava de la muscu.
 ### Installation
 
 ```bash
-git clone https://github.com/Arthur-destb38/Appli_V2.git
-cd Appli_V2
+git clone https://github.com/Arthur-destb38/appli_V3.git
+cd appli_V3
 ./deploy.sh
 ```
 ### ou peut etre essayer 
 
 ```bash
-git clone https://github.com/Arthur-destb38/Appli_V2.git
-cd Appli_V2
+git clone https://github.com/Arthur-destb38/appli_V3.git
+cd appli_V3
 chmod +x deploy.sh   # Si nécessaire
 ./deploy.sh
 ```
@@ -186,7 +186,7 @@ pnpm start
 
 - API : https://appli-v2.onrender.com
 - Doc Swagger : https://appli-v2.onrender.com/docs
-- GitHub : https://github.com/Arthur-destb38/Appli_V2
+- GitHub : https://github.com/Arthur-destb38/appli_V3
 
 ---
 
