@@ -48,17 +48,32 @@ def get_trending_posts(
 ) -> list[TrendingPost]:
     """Récupérer les posts les plus populaires (par likes)."""
     
-    # Récupérer tous les shares avec leur nombre de likes
-    shares = session.exec(select(Share).order_by(Share.created_at.desc()).limit(100)).all()
+    # Optimisation: récupérer les shares récents et compter les likes en une requête
+    # Récupérer plus de shares pour avoir un bon échantillon
+    shares = session.exec(
+        select(Share)
+        .order_by(Share.created_at.desc())
+        .limit(limit * 3)
+    ).all()
     
+    if not shares:
+        return []
+    
+    # Compter les likes pour tous les shares en une seule requête
+    share_ids = [share.share_id for share in shares]
+    likes_counts = session.exec(
+        select(Like.share_id, func.count(Like.id).label('count'))
+        .where(Like.share_id.in_(share_ids))
+        .group_by(Like.share_id)
+    ).all()
+    likes_map = {row[0]: row[1] for row in likes_counts}
+    
+    # Construire la liste avec les counts
     posts_with_likes = []
     for share in shares:
-        like_count = session.exec(
-            select(func.count()).select_from(Like).where(Like.share_id == share.share_id)
-        ).one()
         posts_with_likes.append({
             "share": share,
-            "like_count": like_count,
+            "like_count": likes_map.get(share.share_id, 0),
         })
     
     # Trier par likes (décroissant) puis par date
@@ -87,10 +102,7 @@ def get_suggested_users(
 ) -> list[SuggestedUser]:
     """Récupérer des suggestions d'utilisateurs à suivre."""
     
-    # Récupérer les utilisateurs que l'utilisateur courant ne suit pas déjà
-    all_users = session.exec(select(User)).all()
-    
-    # Filtrer les utilisateurs déjà suivis
+    # Récupérer les IDs des utilisateurs déjà suivis
     following_ids = set()
     if current_user_id:
         following = session.exec(
@@ -99,28 +111,47 @@ def get_suggested_users(
         following_ids = set(following)
         following_ids.add(current_user_id)  # Exclure soi-même
     
+    # Optimisation: filtrer en SQL au lieu de charger tous les users
+    users_query = select(User)
+    if following_ids:
+        users_query = users_query.where(~User.id.in_(following_ids))
+    
+    # Limiter le nombre d'users récupérés
+    users = session.exec(users_query.limit(limit * 3)).all()
+    
+    if not users:
+        return []
+    
+    # Récupérer les counts pour tous les users en une seule requête groupée
+    user_ids = [user.id for user in users]
+    
+    # Compter followers pour tous les users
+    followers_counts = session.exec(
+        select(Follower.followed_id, func.count(Follower.id).label('count'))
+        .where(Follower.followed_id.in_(user_ids))
+        .group_by(Follower.followed_id)
+    ).all()
+    followers_map = {row[0]: row[1] for row in followers_counts}
+    
+    # Compter posts pour tous les users
+    posts_counts = session.exec(
+        select(Share.owner_id, func.count(Share.share_id).label('count'))
+        .where(Share.owner_id.in_(user_ids))
+        .group_by(Share.owner_id)
+    ).all()
+    posts_map = {row[0]: row[1] for row in posts_counts}
+    
+    # Construire la liste avec les counts
     suggested = []
-    for user in all_users:
-        if user.id in following_ids:
-            continue
-        
-        # Compter les followers et posts
-        followers_count = session.exec(
-            select(func.count()).select_from(Follower).where(Follower.followed_id == user.id)
-        ).one()
-        
-        posts_count = session.exec(
-            select(func.count()).select_from(Share).where(Share.owner_id == user.id)
-        ).one()
-        
+    for user in users:
         suggested.append(SuggestedUser(
             id=user.id,
             username=user.username,
             avatar_url=user.avatar_url,
             bio=user.bio,
             objective=user.objective,
-            followers_count=followers_count,
-            posts_count=posts_count,
+            followers_count=followers_map.get(user.id, 0),
+            posts_count=posts_map.get(user.id, 0),
         ))
     
     # Trier par nombre de followers (les plus populaires en premier)
@@ -138,38 +169,74 @@ def search(
     """Rechercher des utilisateurs et des posts."""
     
     query = q.lower().strip()
+    search_pattern = f"%{query}%"
     
-    # Rechercher des utilisateurs
-    users = session.exec(select(User)).all()
+    # Optimisation: Rechercher des utilisateurs directement en SQL avec filtres
+    from sqlalchemy import or_
+    
+    users_query = select(User).where(
+        or_(
+            User.username.ilike(search_pattern),
+            User.bio.ilike(search_pattern) if User.bio else False
+        )
+    ).limit(limit)
+    
+    users = session.exec(users_query).all()
+    
+    # Récupérer les counts pour tous les users en une seule requête
+    user_ids = [user.id for user in users]
     matching_users = []
-    for user in users:
-        if query in user.username.lower() or (user.bio and query in user.bio.lower()):
-            followers_count = session.exec(
-                select(func.count()).select_from(Follower).where(Follower.followed_id == user.id)
-            ).one()
-            posts_count = session.exec(
-                select(func.count()).select_from(Share).where(Share.owner_id == user.id)
-            ).one()
-            
+    
+    if user_ids:
+        # Compter followers et posts pour tous les users en une fois
+        followers_counts = session.exec(
+            select(Follower.followed_id, func.count(Follower.id).label('count'))
+            .where(Follower.followed_id.in_(user_ids))
+            .group_by(Follower.followed_id)
+        ).all()
+        followers_map = {row[0]: row[1] for row in followers_counts}
+        
+        posts_counts = session.exec(
+            select(Share.owner_id, func.count(Share.share_id).label('count'))
+            .where(Share.owner_id.in_(user_ids))
+            .group_by(Share.owner_id)
+        ).all()
+        posts_map = {row[0]: row[1] for row in posts_counts}
+        
+        for user in users:
             matching_users.append(SuggestedUser(
                 id=user.id,
                 username=user.username,
                 avatar_url=user.avatar_url,
                 bio=user.bio,
                 objective=user.objective,
-                followers_count=followers_count,
-                posts_count=posts_count,
+                followers_count=followers_map.get(user.id, 0),
+                posts_count=posts_map.get(user.id, 0),
             ))
     
-    # Rechercher des posts
-    shares = session.exec(select(Share)).all()
+    # Optimisation: Rechercher des posts directement en SQL avec filtres
+    shares_query = select(Share).where(
+        or_(
+            Share.workout_title.ilike(search_pattern),
+            Share.owner_username.ilike(search_pattern)
+        )
+    ).limit(limit)
+    
+    shares = session.exec(shares_query).all()
+    
+    # Récupérer les counts de likes pour tous les shares en une seule requête
+    share_ids = [share.share_id for share in shares]
     matching_posts = []
-    for share in shares:
-        if query in share.workout_title.lower() or query in share.owner_username.lower():
-            like_count = session.exec(
-                select(func.count()).select_from(Like).where(Like.share_id == share.share_id)
-            ).one()
-            
+    
+    if share_ids:
+        likes_counts = session.exec(
+            select(Like.share_id, func.count(Like.id).label('count'))
+            .where(Like.share_id.in_(share_ids))
+            .group_by(Like.share_id)
+        ).all()
+        likes_map = {row[0]: row[1] for row in likes_counts}
+        
+        for share in shares:
             matching_posts.append(TrendingPost(
                 share_id=share.share_id,
                 owner_id=share.owner_id,
@@ -177,7 +244,7 @@ def search(
                 workout_title=share.workout_title,
                 exercise_count=share.exercise_count,
                 set_count=share.set_count,
-                like_count=like_count,
+                like_count=likes_map.get(share.share_id, 0),
                 created_at=share.created_at.isoformat(),
             ))
     

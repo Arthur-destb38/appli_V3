@@ -5,6 +5,7 @@ from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from fastapi.responses import Response
+from sqlalchemy import func
 from sqlmodel import Session, select
 
 from ..db import get_session
@@ -74,7 +75,13 @@ def get_feed(
     statement = select(Share)
     parsed_cursor: Optional[datetime] = None
     if cursor:
-        parsed_cursor = datetime.fromisoformat(cursor)
+        try:
+            parsed_cursor = datetime.fromisoformat(cursor)
+        except ValueError:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Invalid cursor format. Expected ISO 8601 datetime string."
+            )
         statement = statement.where(Share.created_at <= parsed_cursor)
     statement = statement.order_by(Share.created_at.desc()).limit(limit + 1)
 
@@ -84,20 +91,47 @@ def get_feed(
         next_cursor = shares[-1].created_at
         shares = shares[:limit]
 
+    # Optimisation: récupérer tous les share_ids pour faire des requêtes groupées
+    share_ids = [share.share_id for share in shares]
+    
+    if not share_ids:
+        return FeedResponse(items=[], next_cursor=None)
+    
+    # Récupérer tous les commentaires en une seule requête (limité à 2 par share)
+    # Pour chaque share, on veut les 2 derniers commentaires
+    all_comments = session.exec(
+        select(Comment)
+        .where(Comment.share_id.in_(share_ids))
+        .order_by(Comment.share_id, Comment.created_at.desc())
+    ).all()
+    
+    # Grouper les commentaires par share_id et prendre les 2 premiers de chaque
+    comments_by_share: dict[str, list[Comment]] = {}
+    for comment in all_comments:
+        if comment.share_id not in comments_by_share:
+            comments_by_share[comment.share_id] = []
+        if len(comments_by_share[comment.share_id]) < 2:
+            comments_by_share[comment.share_id].append(comment)
+    
+    # Compter les commentaires et likes en une seule requête par type
+    comment_counts = session.exec(
+        select(Comment.share_id, func.count(Comment.id).label('count'))
+        .where(Comment.share_id.in_(share_ids))
+        .group_by(Comment.share_id)
+    ).all()
+    comment_count_map = {row[0]: row[1] for row in comment_counts}
+    
+    like_counts = session.exec(
+        select(Like.share_id, func.count(Like.id).label('count'))
+        .where(Like.share_id.in_(share_ids))
+        .group_by(Like.share_id)
+    ).all()
+    like_count_map = {row[0]: row[1] for row in like_counts}
+
     items = []
     for share in shares:
-        # Récupérer les commentaires (limité à 2 pour l'aperçu)
-        comments_stmt = select(Comment).where(Comment.share_id == share.share_id).order_by(Comment.created_at.desc()).limit(2)
-        comments = session.exec(comments_stmt).all()
         
-        # Compter le total des commentaires
-        comment_count_stmt = select(Comment).where(Comment.share_id == share.share_id)
-        comment_count = len(session.exec(comment_count_stmt).all())
-        
-        # Compter les likes
-        like_count_stmt = select(Like).where(Like.share_id == share.share_id)
-        like_count = len(session.exec(like_count_stmt).all())
-        
+        share_comments = comments_by_share.get(share.share_id, [])
         items.append({
             'share_id': share.share_id,
             'owner_id': share.owner_id,
@@ -106,15 +140,15 @@ def get_feed(
             'exercise_count': share.exercise_count,
             'set_count': share.set_count,
             'created_at': share.created_at,
-            'like_count': like_count,
-            'comment_count': comment_count,
+            'like_count': like_count_map.get(share.share_id, 0),
+            'comment_count': comment_count_map.get(share.share_id, 0),
             'comments': [
                 {
                     'id': c.id,
                     'username': c.username,
                     'content': c.content,
                 }
-                for c in reversed(comments)  # Ordre chronologique pour l'affichage
+                for c in reversed(share_comments)  # Ordre chronologique pour l'affichage
             ],
         })
 

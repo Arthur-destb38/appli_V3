@@ -18,7 +18,7 @@ def _generate_share_id() -> str:
     return f"sh_{uuid.uuid4().hex[:12]}"
 
 
-def _fetch_workout_snapshot(session: Session, workout_id: int) -> dict:
+def _fetch_workout_snapshot(session: Session, workout_id: str) -> dict:
     workout = session.get(Workout, workout_id)
     if workout is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="workout_not_found")

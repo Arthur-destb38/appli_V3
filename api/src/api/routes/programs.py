@@ -133,7 +133,7 @@ def create_program(payload: ProgramCreate, session: Session = Depends(get_sessio
 
 
 @router.get("/{program_id}", response_model=ProgramRead, summary="Détail d'un programme")
-def get_program(program_id: int, session: Session = Depends(get_session)) -> ProgramRead:
+def get_program(program_id: str, session: Session = Depends(get_session)) -> ProgramRead:
     program = session.get(Program, program_id)
     if not program:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Programme introuvable")
