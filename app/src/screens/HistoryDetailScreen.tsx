@@ -1,12 +1,16 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState, useRef, useEffect } from 'react';
 import {
   Alert,
   ScrollView,
   StyleSheet,
   Text,
-  TouchableOpacity,
   View,
+  Animated,
+  Easing,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Ionicons } from '@expo/vector-icons';
+import * as Haptics from 'expo-haptics';
 
 import { useRouter } from 'expo-router';
 
@@ -19,6 +23,10 @@ import {
   calculateWorkoutVolume,
   formatDuration,
 } from '@/utils/workoutSummary';
+import { useAppTheme } from '@/theme/ThemeProvider';
+import { AppButton } from '@/components/AppButton';
+import { AppCard } from '@/components/AppCard';
+import { Pressable } from 'react-native';
 
 interface Props {
   workoutId: number;
@@ -41,10 +49,21 @@ const formatSetLine = (set: WorkoutSet) => {
 
 export const HistoryDetailScreen: React.FC<Props> = ({ workoutId }) => {
   const router = useRouter();
+  const { theme } = useAppTheme();
+  const insets = useSafeAreaInsets();
   const { findWorkout, duplicateWorkout } = useWorkouts();
   const [isDuplicating, setIsDuplicating] = useState(false);
+  const fadeAnim = useRef(new Animated.Value(0)).current;
 
   const workout = useMemo(() => findWorkout(workoutId), [findWorkout, workoutId]);
+
+  useEffect(() => {
+    Animated.timing(fadeAnim, {
+      toValue: 1,
+      duration: 400,
+      useNativeDriver: true,
+    }).start();
+  }, []);
 
   const summary = useMemo(() => {
     if (!workout) {
@@ -90,19 +109,23 @@ export const HistoryDetailScreen: React.FC<Props> = ({ workoutId }) => {
 
   if (!workout) {
     return (
-      <View style={styles.emptyContainer}>
-        <Text style={styles.emptyTitle}>Séance introuvable</Text>
-        <Text style={styles.emptySubtitle}>
+      <View style={[styles.emptyContainer, { backgroundColor: theme.colors.background }]}>
+        <Ionicons name="alert-circle-outline" size={64} color={theme.colors.textSecondary} />
+        <Text style={[styles.emptyTitle, { color: theme.colors.textPrimary }]}>Séance introuvable</Text>
+        <Text style={[styles.emptySubtitle, { color: theme.colors.textSecondary }]}>
           Retourne à l'historique pour sélectionner une séance valide.
         </Text>
-        <TouchableOpacity style={styles.backButton} onPress={() => router.push('/history')}>
-          <Text style={styles.backButtonText}>Revenir à l'historique</Text>
-        </TouchableOpacity>
+        <AppButton
+          title="Revenir à l'historique"
+          onPress={() => router.push('/history')}
+          style={styles.backButton}
+        />
       </View>
     );
   }
 
   const handleDuplicate = async () => {
+    Haptics.selectionAsync().catch(() => {});
     setIsDuplicating(true);
     try {
       const duplicated = await duplicateWorkout(workout.workout.id);
@@ -113,9 +136,11 @@ export const HistoryDetailScreen: React.FC<Props> = ({ workoutId }) => {
         );
         return;
       }
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
       router.push(`/create?id=${duplicated.workout.id}`);
     } catch (error) {
       console.warn('Failed to duplicate workout', error);
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error).catch(() => {});
       Alert.alert(
         'Duplication impossible',
         'Une erreur est survenue lors de la duplication. Réessaie plus tard.'
@@ -126,10 +151,12 @@ export const HistoryDetailScreen: React.FC<Props> = ({ workoutId }) => {
   };
 
   const handleRelaunch = () => {
+    Haptics.selectionAsync().catch(() => {});
     router.push(`/track/${workout.workout.id}`);
   };
 
   const handleOpenProgress = (exerciseId: string, exerciseName: string) => {
+    Haptics.selectionAsync().catch(() => {});
     router.push({
       pathname: '/history/progression',
       params: {
@@ -139,210 +166,337 @@ export const HistoryDetailScreen: React.FC<Props> = ({ workoutId }) => {
     });
   };
 
-  return (
-    <ScrollView contentContainerStyle={styles.container}>
-      <View style={styles.headerCard}>
-        <View style={styles.headerRow}>
-          <Text style={styles.title}>{workout.workout.title}</Text>
-          <View
-            style={[
-              styles.statusBadge,
-              workout.workout.status === 'completed' ? styles.badgeCompleted : styles.badgeDraft,
-            ]}>
-            <Text style={styles.statusText}>
-              {workout.workout.status === 'completed' ? 'Terminée' : 'Brouillon'}
-            </Text>
-          </View>
-        </View>
-        <Text style={styles.metaLine}>
-          {formatDate(workout.workout.updated_at)} · {workout.exercises.length} exercice(s) ·{' '}
-          {workout.sets.length} série(s)
-        </Text>
-        <View style={styles.summaryRow}>
-          <SummaryItem label="Volume total" value={`${Math.round(summary.volume)} kg`} />
-          <SummaryItem
-            label="Séries validées"
-            value={`${summary.completedSets}/${summary.totalSets || 0}`}
-          />
-          <SummaryItem
-            label="Durée estimée"
-            value={summary.durationLabel ?? 'Non disponible'}
-          />
-        </View>
-        {workout.workout.server_id ? (
-          <View style={styles.syncBadge}>
-            <Text style={styles.syncText}>Synchronisée</Text>
-          </View>
-        ) : null}
-      </View>
+  const ExerciseCard: React.FC<{ exercise: typeof exercises[0]; index: number }> = ({ exercise, index }) => {
+    const cardAnim = useRef(new Animated.Value(0)).current;
 
-      <View style={styles.actionsRow}>
-        <TouchableOpacity
-          style={[styles.actionButton, styles.primaryButton]}
-          onPress={handleDuplicate}
-          disabled={isDuplicating}>
-          <Text style={styles.primaryButtonText}>
-            {isDuplicating ? 'Duplication…' : 'Dupliquer'}
-          </Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={[styles.actionButton, styles.secondaryButton]} onPress={handleRelaunch}>
-          <Text style={styles.secondaryButtonText}>Relancer</Text>
-        </TouchableOpacity>
-      </View>
+    useEffect(() => {
+      Animated.timing(cardAnim, {
+        toValue: 1,
+        duration: 400,
+        delay: index * 100,
+        easing: Easing.out(Easing.back(1.1)),
+        useNativeDriver: true,
+      }).start();
+    }, [cardAnim, index]);
 
-      {exercises.length === 0 ? (
-        <View style={styles.emptyExercises}>
-          <Text style={styles.emptyExercisesTitle}>Aucun exercice enregistré</Text>
-          <Text style={styles.emptyExercisesSubtitle}>
-            Les exercices de cette séance n'ont pas encore été saisis.
-          </Text>
-        </View>
-      ) : (
-        exercises.map((exercise) => (
-          <View key={exercise.id} style={styles.exerciseCard}>
-            <View style={styles.exerciseHeader}>
-              <View>
-                <Text style={styles.exerciseName}>{exercise.name}</Text>
-                <Text style={styles.exerciseCode}>{exercise.code}</Text>
-              </View>
-              <View style={styles.exerciseMetaColumn}>
-                <Text style={styles.exerciseMeta}>
-                  {exercise.sets.length} série(s){' '}
-                  {exercise.volume ? `· ${Math.round(exercise.volume)} kg` : ''}
-                </Text>
-                <TouchableOpacity
-                  style={styles.progressLink}
-                  onPress={() => handleOpenProgress(exercise.code, exercise.name)}>
-                  <Text style={styles.progressLinkText}>Voir la progression</Text>
-                </TouchableOpacity>
-              </View>
+    return (
+      <Animated.View
+        style={{
+          opacity: cardAnim,
+          transform: [
+            {
+              translateY: cardAnim.interpolate({
+                inputRange: [0, 1],
+                outputRange: [30, 0],
+              }),
+            },
+          ],
+        }}
+      >
+        <AppCard style={styles.exerciseCard}>
+          <View style={styles.exerciseHeader}>
+            <View style={styles.exerciseInfo}>
+              <Text style={[styles.exerciseName, { color: theme.colors.textPrimary }]}>{exercise.name}</Text>
+              <Text style={[styles.exerciseCode, { color: theme.colors.textSecondary }]}>{exercise.code}</Text>
             </View>
-            {exercise.sets.length === 0 ? (
-              <Text style={styles.noSets}>Aucune série enregistrée pour cet exercice.</Text>
-            ) : (
-              exercise.sets.map((set, index) => (
+            <View style={styles.exerciseMetaColumn}>
+              <Text style={[styles.exerciseMeta, { color: theme.colors.textSecondary }]}>
+                {exercise.sets.length} série{exercise.sets.length > 1 ? 's' : ''}
+                {exercise.volume ? ` · ${Math.round(exercise.volume)} kg` : ''}
+              </Text>
+              <Pressable
+                style={({ pressed }) => [
+                  styles.progressLink,
+                  {
+                    backgroundColor: theme.colors.accent + '20',
+                    opacity: pressed ? 0.7 : 1,
+                  },
+                ]}
+                onPress={() => handleOpenProgress(exercise.code, exercise.name)}
+              >
+                <Ionicons name="trending-up" size={14} color={theme.colors.accent} />
+                <Text style={[styles.progressLinkText, { color: theme.colors.accent }]}>
+                  Progression
+                </Text>
+              </Pressable>
+            </View>
+          </View>
+          {exercise.sets.length === 0 ? (
+            <View style={[styles.noSetsContainer, { backgroundColor: theme.colors.surfaceMuted }]}>
+              <Text style={[styles.noSets, { color: theme.colors.textSecondary }]}>
+                Aucune série enregistrée pour cet exercice.
+              </Text>
+            </View>
+          ) : (
+            <View style={styles.setsContainer}>
+              {exercise.sets.map((set, setIndex) => (
                 <View
                   key={set.id}
-                  style={[styles.setCard, set.done_at ? styles.setCardCompleted : null]}>
+                  style={[
+                    styles.setCard,
+                    {
+                      backgroundColor: set.done_at
+                        ? theme.colors.primaryMuted + '30'
+                        : theme.colors.surface,
+                      borderColor: set.done_at ? theme.colors.primaryMuted : theme.colors.border,
+                    },
+                  ]}
+                >
                   <View style={styles.setHeader}>
-                    <Text style={styles.setTitle}>Série {index + 1}</Text>
-                    <Text
+                    <View style={styles.setTitleRow}>
+                      <Text style={[styles.setTitle, { color: theme.colors.textPrimary }]}>
+                        Série {setIndex + 1}
+                      </Text>
+                      {set.done_at && (
+                        <Ionicons name="checkmark-circle" size={16} color={theme.colors.primaryMuted} />
+                      )}
+                    </View>
+                    <View
                       style={[
-                        styles.setStatus,
-                        set.done_at ? styles.setStatusDone : styles.setStatusPlanned,
-                      ]}>
-                      {set.done_at ? 'Validée' : 'Planifiée'}
-                    </Text>
+                        styles.setStatusBadge,
+                        {
+                          backgroundColor: set.done_at
+                            ? theme.colors.primaryMuted + '20'
+                            : theme.colors.surfaceMuted,
+                        },
+                      ]}
+                    >
+                      <Text
+                        style={[
+                          styles.setStatus,
+                          {
+                            color: set.done_at
+                              ? theme.colors.primaryMuted
+                              : theme.colors.textSecondary,
+                          },
+                        ]}
+                      >
+                        {set.done_at ? 'Validée' : 'Planifiée'}
+                      </Text>
+                    </View>
                   </View>
-                  <Text style={styles.setDescription}>{formatSetLine(set)}</Text>
-                  {set.done_at ? (
-                    <Text style={styles.setTimestamp}>Validée le {formatDate(set.done_at)}</Text>
-                  ) : null}
+                  <Text style={[styles.setDescription, { color: theme.colors.textPrimary }]}>
+                    {formatSetLine(set)}
+                  </Text>
+                  {set.done_at && (
+                    <View style={styles.setTimestampRow}>
+                      <Ionicons name="time-outline" size={12} color={theme.colors.textSecondary} />
+                      <Text style={[styles.setTimestamp, { color: theme.colors.textSecondary }]}>
+                        Validée le {formatDate(set.done_at)}
+                      </Text>
+                    </View>
+                  )}
                 </View>
-              ))
-            )}
+              ))}
+            </View>
+          )}
+        </AppCard>
+      </Animated.View>
+    );
+  };
+
+  return (
+    <Animated.View
+      style={[
+        styles.container,
+        {
+          backgroundColor: theme.colors.background,
+          paddingTop: insets.top,
+          opacity: fadeAnim,
+        },
+      ]}
+    >
+      <ScrollView
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
+      >
+        <AppCard style={styles.headerCard}>
+          <View style={styles.headerRow}>
+            <Text style={[styles.title, { color: theme.colors.textPrimary }]} numberOfLines={2}>
+              {workout.workout.title}
+            </Text>
+            <View
+              style={[
+                styles.statusBadge,
+                {
+                  backgroundColor:
+                    workout.workout.status === 'completed'
+                      ? theme.colors.primaryMuted
+                      : theme.colors.surfaceMuted,
+                  borderColor: theme.colors.border,
+                },
+              ]}
+            >
+              <Text
+                style={[
+                  styles.statusText,
+                  { color: theme.colors.textPrimary },
+                ]}
+              >
+                {workout.workout.status === 'completed' ? 'Terminée' : 'Brouillon'}
+              </Text>
+            </View>
           </View>
-        ))
-      )}
-    </ScrollView>
+          <Text style={[styles.metaLine, { color: theme.colors.textSecondary }]}>
+            {formatDate(workout.workout.updated_at)} · {workout.exercises.length} exercice
+            {workout.exercises.length > 1 ? 's' : ''} · {workout.sets.length} série
+            {workout.sets.length > 1 ? 's' : ''}
+          </Text>
+          <View style={styles.summaryRow}>
+            <SummaryItem
+              label="Volume total"
+              value={`${Math.round(summary.volume)} kg`}
+              icon="barbell"
+            />
+            <SummaryItem
+              label="Séries validées"
+              value={`${summary.completedSets}/${summary.totalSets || 0}`}
+              icon="checkmark-circle"
+            />
+            <SummaryItem
+              label="Durée estimée"
+              value={summary.durationLabel ?? 'Non disponible'}
+              icon="time"
+            />
+          </View>
+          {workout.workout.server_id && (
+            <View style={[styles.syncBadge, { backgroundColor: theme.colors.accent + '20' }]}>
+              <Ionicons name="checkmark-circle" size={14} color={theme.colors.accent} />
+              <Text style={[styles.syncText, { color: theme.colors.accent }]}>Synchronisée</Text>
+            </View>
+          )}
+        </AppCard>
+
+        <View style={styles.actionsRow}>
+          <AppButton
+            title={isDuplicating ? 'Duplication…' : 'Dupliquer'}
+            onPress={handleDuplicate}
+            loading={isDuplicating}
+            disabled={isDuplicating}
+            style={styles.actionButton}
+            variant="primary"
+          />
+          <AppButton
+            title="Relancer"
+            onPress={handleRelaunch}
+            variant="secondary"
+            style={styles.actionButton}
+          />
+        </View>
+
+        {exercises.length === 0 ? (
+          <AppCard style={styles.emptyExercises}>
+            <Ionicons name="fitness-outline" size={48} color={theme.colors.textSecondary} />
+            <Text style={[styles.emptyExercisesTitle, { color: theme.colors.textPrimary }]}>
+              Aucun exercice enregistré
+            </Text>
+            <Text style={[styles.emptyExercisesSubtitle, { color: theme.colors.textSecondary }]}>
+              Les exercices de cette séance n'ont pas encore été saisis.
+            </Text>
+          </AppCard>
+        ) : (
+          exercises.map((exercise, index) => (
+            <ExerciseCard key={exercise.id} exercise={exercise} index={index} />
+          ))
+        )}
+      </ScrollView>
+    </Animated.View>
   );
 };
 
 interface SummaryItemProps {
   label: string;
   value: string;
+  icon: string;
 }
 
-const SummaryItem: React.FC<SummaryItemProps> = ({ label, value }) => (
-  <View style={styles.summaryItem}>
-    <Text style={styles.summaryLabel}>{label}</Text>
-    <Text style={styles.summaryValue}>{value}</Text>
-  </View>
-);
+const SummaryItem: React.FC<SummaryItemProps> = ({ label, value, icon }) => {
+  const { theme } = useAppTheme();
+  return (
+    <View style={[styles.summaryItem, { backgroundColor: theme.colors.surfaceMuted }]}>
+      <Ionicons name={icon as any} size={16} color={theme.colors.accent} />
+      <Text style={[styles.summaryLabel, { color: theme.colors.textSecondary }]}>{label}</Text>
+      <Text style={[styles.summaryValue, { color: theme.colors.textPrimary }]}>{value}</Text>
+    </View>
+  );
+};
 
 export default HistoryDetailScreen;
 
 const styles = StyleSheet.create({
   container: {
+    flex: 1,
+  },
+  scrollContent: {
     padding: 16,
     gap: 16,
+    paddingBottom: 32,
   },
   headerCard: {
-    backgroundColor: 'white',
-    borderRadius: 16,
-    padding: 20,
-    gap: 12,
-    shadowColor: '#0F172A',
-    shadowOpacity: 0.08,
-    shadowRadius: 12,
-    shadowOffset: { width: 0, height: 8 },
-    elevation: 3,
+    gap: 16,
   },
   headerRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     gap: 12,
   },
   title: {
     fontSize: 24,
     fontWeight: '700',
     flex: 1,
-    flexWrap: 'wrap',
   },
   statusBadge: {
-    paddingVertical: 4,
+    paddingVertical: 6,
     paddingHorizontal: 12,
     borderRadius: 999,
-  },
-  badgeCompleted: {
-    backgroundColor: '#DCFCE7',
-  },
-  badgeDraft: {
-    backgroundColor: '#FDE68A',
+    borderWidth: 1,
   },
   statusText: {
     fontSize: 12,
-    fontWeight: '600',
-    color: '#0F172A',
+    fontWeight: '700',
   },
   metaLine: {
     fontSize: 14,
-    color: '#475569',
+    fontWeight: '500',
   },
   summaryRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     gap: 8,
+    marginTop: 4,
   },
   summaryItem: {
     flex: 1,
-    backgroundColor: '#F8FAFC',
     borderRadius: 12,
     padding: 12,
-    gap: 4,
+    gap: 6,
+    alignItems: 'center',
   },
   summaryLabel: {
-    color: '#64748B',
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: '600',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+    textAlign: 'center',
   },
   summaryValue: {
     fontSize: 16,
-    fontWeight: '600',
-    color: '#0F172A',
+    fontWeight: '700',
+    textAlign: 'center',
   },
   syncBadge: {
     alignSelf: 'flex-start',
-    backgroundColor: '#DBEAFE',
-    paddingVertical: 4,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingVertical: 6,
     paddingHorizontal: 12,
     borderRadius: 999,
   },
   syncText: {
     fontSize: 12,
     fontWeight: '600',
-    color: '#1E3A8A',
   },
   actionsRow: {
     flexDirection: 'row',
@@ -350,119 +504,100 @@ const styles = StyleSheet.create({
   },
   actionButton: {
     flex: 1,
-    borderRadius: 12,
-    paddingVertical: 14,
-    alignItems: 'center',
-  },
-  primaryButton: {
-    backgroundColor: '#E11D48',
-  },
-  primaryButtonText: {
-    color: 'white',
-    fontWeight: '700',
-    fontSize: 16,
-  },
-  secondaryButton: {
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
-    backgroundColor: 'white',
-  },
-  secondaryButtonText: {
-    color: '#1D4ED8',
-    fontWeight: '600',
   },
   exerciseCard: {
-    backgroundColor: 'white',
-    borderRadius: 16,
-    padding: 16,
     gap: 12,
-    shadowColor: '#0F172A0F',
-    shadowOpacity: 0.08,
-    shadowRadius: 10,
-    shadowOffset: { width: 0, height: 4 },
-    elevation: 1,
   },
   exerciseHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
+    alignItems: 'flex-start',
     gap: 12,
-    alignItems: 'center',
+  },
+  exerciseInfo: {
+    flex: 1,
   },
   exerciseName: {
     fontSize: 18,
     fontWeight: '700',
+    marginBottom: 4,
   },
   exerciseCode: {
     fontSize: 12,
-    color: '#94A3B8',
-  },
-  exerciseMeta: {
-    fontSize: 12,
-    color: '#475569',
-    fontWeight: '600',
+    fontWeight: '500',
   },
   exerciseMetaColumn: {
     alignItems: 'flex-end',
-    gap: 4,
+    gap: 8,
+  },
+  exerciseMeta: {
+    fontSize: 12,
+    fontWeight: '600',
   },
   progressLink: {
-    paddingVertical: 4,
-    paddingHorizontal: 8,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingVertical: 6,
+    paddingHorizontal: 10,
     borderRadius: 8,
-    backgroundColor: '#DBEAFE',
   },
   progressLinkText: {
     fontSize: 12,
     fontWeight: '600',
-    color: '#1D4ED8',
   },
-  noSets: {
-    color: '#6B7280',
-    fontStyle: 'italic',
+  setsContainer: {
+    gap: 8,
   },
   setCard: {
     borderWidth: 1,
-    borderColor: '#E2E8F0',
     borderRadius: 12,
     padding: 12,
     gap: 8,
-  },
-  setCardCompleted: {
-    backgroundColor: '#DCFCE7',
-    borderColor: '#BBF7D0',
   },
   setHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
   },
+  setTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
   setTitle: {
-    fontWeight: '600',
+    fontWeight: '700',
     fontSize: 16,
   },
+  setStatusBadge: {
+    paddingVertical: 4,
+    paddingHorizontal: 8,
+    borderRadius: 6,
+  },
   setStatus: {
-    fontSize: 12,
-  },
-  setStatusDone: {
-    color: '#15803D',
+    fontSize: 11,
     fontWeight: '700',
-  },
-  setStatusPlanned: {
-    color: '#94A3B8',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
   },
   setDescription: {
     fontSize: 14,
-    color: '#334155',
+    fontWeight: '500',
+  },
+  setTimestampRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
   },
   setTimestamp: {
-    fontSize: 12,
-    color: '#475569',
+    fontSize: 11,
+    fontWeight: '500',
   },
   emptyContainer: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 12,
+    gap: 16,
     padding: 24,
   },
   emptyTitle: {
@@ -471,34 +606,32 @@ const styles = StyleSheet.create({
   },
   emptySubtitle: {
     fontSize: 14,
-    color: '#64748B',
     textAlign: 'center',
   },
   backButton: {
-    marginTop: 12,
-    paddingVertical: 10,
-    paddingHorizontal: 18,
-    borderRadius: 12,
-    backgroundColor: '#1D4ED8',
-  },
-  backButtonText: {
-    color: 'white',
-    fontWeight: '600',
+    marginTop: 8,
   },
   emptyExercises: {
     padding: 32,
-    borderRadius: 16,
-    backgroundColor: '#EEF2FF',
     alignItems: 'center',
-    gap: 8,
+    gap: 12,
   },
   emptyExercisesTitle: {
     fontSize: 18,
-    fontWeight: '600',
+    fontWeight: '700',
   },
   emptyExercisesSubtitle: {
     fontSize: 14,
-    color: '#475569',
+    textAlign: 'center',
+  },
+  noSetsContainer: {
+    padding: 16,
+    borderRadius: 12,
+    alignItems: 'center',
+  },
+  noSets: {
+    fontSize: 14,
+    fontStyle: 'italic',
     textAlign: 'center',
   },
 });

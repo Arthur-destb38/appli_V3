@@ -153,6 +153,41 @@ export const createWorkout = async (
   return { id: insertedId, client_id: clientId, created_at: now, updated_at: now };
 };
 
+export const createWorkoutWithServerId = async (
+  title: string,
+  serverId: string | number
+): Promise<{ id: number; client_id: string | null; created_at: number; updated_at: number }> => {
+  if (isUsingFallbackDatabase()) {
+    const store = getFallbackStore();
+    const now = Date.now();
+    const id = ++store.counters.workout;
+    const clientId = generateClientId();
+    const serverIdNum = typeof serverId === 'string' ? parseInt(serverId, 10) : serverId;
+    const workoutRow: WorkoutRow = {
+      id,
+      client_id: clientId,
+      server_id: serverIdNum,
+      title,
+      status: 'draft',
+      created_at: now,
+      updated_at: now,
+      deleted_at: null,
+    };
+    store.workouts.push(workoutRow);
+    return { id, client_id: clientId, created_at: now, updated_at: now };
+  }
+
+  const now = Date.now();
+  const clientId = generateClientId();
+  const serverIdNum = typeof serverId === 'string' ? parseInt(serverId, 10) : serverId;
+  const result = await runSql(
+    'INSERT INTO workouts (client_id, server_id, title, status, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)',
+    [clientId, serverIdNum, title, 'draft', now, now]
+  );
+  const insertedId = result.insertId ?? 0;
+  return { id: insertedId, client_id: clientId, created_at: now, updated_at: now };
+};
+
 export const updateWorkoutTitle = async (id: number, title: string): Promise<void> => {
   if (isUsingFallbackDatabase()) {
     const store = getFallbackStore();

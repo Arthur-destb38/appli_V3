@@ -3,10 +3,9 @@ import {
   View,
   Text,
   TextInput,
-  TouchableOpacity,
+  Pressable,
   StyleSheet,
   Alert,
-  ActivityIndicator,
   KeyboardAvoidingView,
   Platform,
   ScrollView,
@@ -14,6 +13,7 @@ import {
 import { useRouter } from 'expo-router';
 import { useAuth } from '@/hooks/useAuth';
 import { useAppTheme } from '@/theme/ThemeProvider';
+import { AppButton } from '@/components/AppButton';
 
 export default function RegisterScreen() {
   const router = useRouter();
@@ -122,19 +122,15 @@ export default function RegisterScreen() {
             />
           </View>
 
-          <TouchableOpacity
-            style={[styles.button, { backgroundColor: theme.colors.accent }, loading && styles.buttonDisabled]}
+          <AppButton
+            title="S'inscrire"
             onPress={handleRegister}
+            loading={loading}
             disabled={loading}
-          >
-            {loading ? (
-              <ActivityIndicator color="#fff" />
-            ) : (
-              <Text style={styles.buttonText}>S'inscrire</Text>
-            )}
-          </TouchableOpacity>
+            style={styles.button}
+          />
 
-          <TouchableOpacity
+          <Pressable
             style={styles.linkButton}
             onPress={() => router.back()}
             disabled={loading}
@@ -142,7 +138,7 @@ export default function RegisterScreen() {
             <Text style={[styles.linkText, { color: theme.colors.accent }]}>
               Déjà un compte ? Se connecter
             </Text>
-          </TouchableOpacity>
+          </Pressable>
         </View>
       </ScrollView>
     </KeyboardAvoidingView>
@@ -189,19 +185,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
   },
   button: {
-    height: 50,
-    borderRadius: 12,
-    justifyContent: 'center',
-    alignItems: 'center',
     marginTop: 10,
-  },
-  buttonDisabled: {
-    opacity: 0.6,
-  },
-  buttonText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: '600',
   },
   linkButton: {
     marginTop: 20,

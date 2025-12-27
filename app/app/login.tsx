@@ -3,10 +3,9 @@ import {
   View,
   Text,
   TextInput,
-  TouchableOpacity,
+  Pressable,
   StyleSheet,
   Alert,
-  ActivityIndicator,
   KeyboardAvoidingView,
   Platform,
   ScrollView,
@@ -14,6 +13,7 @@ import {
 import { useRouter } from 'expo-router';
 import { useAuth } from '@/hooks/useAuth';
 import { useAppTheme } from '@/theme/ThemeProvider';
+import { AppButton } from '@/components/AppButton';
 
 export default function LoginScreen() {
   const router = useRouter();
@@ -94,19 +94,15 @@ export default function LoginScreen() {
             />
           </View>
 
-          <TouchableOpacity
-            style={[styles.button, { backgroundColor: theme.colors.accent }, loading && styles.buttonDisabled]}
+          <AppButton
+            title="Se connecter"
             onPress={handleLogin}
+            loading={loading}
             disabled={loading}
-          >
-            {loading ? (
-              <ActivityIndicator color="#fff" />
-            ) : (
-              <Text style={styles.buttonText}>Se connecter</Text>
-            )}
-          </TouchableOpacity>
+            style={styles.button}
+          />
 
-          <TouchableOpacity
+          <Pressable
             style={styles.linkButton}
             onPress={() => router.push('/register')}
             disabled={loading}
@@ -114,7 +110,7 @@ export default function LoginScreen() {
             <Text style={[styles.linkText, { color: theme.colors.accent }]}>
               Pas encore de compte ? S'inscrire
             </Text>
-          </TouchableOpacity>
+          </Pressable>
         </View>
       </ScrollView>
     </KeyboardAvoidingView>
@@ -161,19 +157,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
   },
   button: {
-    height: 50,
-    borderRadius: 12,
-    justifyContent: 'center',
-    alignItems: 'center',
     marginTop: 10,
-  },
-  buttonDisabled: {
-    opacity: 0.6,
-  },
-  buttonText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: '600',
   },
   linkButton: {
     marginTop: 20,

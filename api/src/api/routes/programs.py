@@ -7,8 +7,9 @@ import random
 from collections import defaultdict
 
 from ..db import get_session
-from ..models import Program, ProgramSession, ProgramSet, Exercise
+from ..models import Program, ProgramSession, ProgramSet, Exercise, Workout, WorkoutExercise, Set
 from ..schemas import ProgramCreate, ProgramRead
+from datetime import datetime, timezone
 
 router = APIRouter(prefix="/programs", tags=["programs"])
 
@@ -220,4 +221,95 @@ def generate_program(payload: GenerateProgramRequest, session: Session = Depends
         duration_weeks=program.duration_weeks,
         user_id=program.user_id,
         sessions=session_reads,
+    )
+
+
+class ProgramSaveResponse(BaseModel):
+    program_id: str
+    workouts_created: int
+    workouts: list[dict]
+
+
+@router.post("/{program_id}/save", response_model=ProgramSaveResponse, summary="Enregistrer un programme et créer les séances associées")
+def save_program(
+    program_id: str,
+    session: Session = Depends(get_session)
+) -> ProgramSaveResponse:
+    program = session.get(Program, program_id)
+    if not program:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Programme introuvable")
+
+    # Récupérer toutes les sessions du programme
+    prog_sessions = session.exec(select(ProgramSession).where(ProgramSession.program_id == program.id)).all()
+    
+    workouts_created = []
+    user_id = program.user_id or "guest-user"
+    now = datetime.now(timezone.utc)
+
+    for prog_session in prog_sessions:
+        # Créer un workout pour chaque session du programme
+        workout = Workout(
+            user_id=user_id,
+            title=prog_session.title or f"Séance {prog_session.day_index + 1} du programme",
+            status="draft",
+            created_at=now,
+            updated_at=now,
+        )
+        session.add(workout)
+        session.flush()
+
+        # Récupérer les sets de la session
+        prog_sets = session.exec(
+            select(ProgramSet)
+            .where(ProgramSet.program_session_id == prog_session.id)
+            .order_by(ProgramSet.order_index)
+        ).all()
+
+        # Grouper les sets par exercice
+        exercises_map: dict[str, list[ProgramSet]] = {}
+        for prog_set in prog_sets:
+            slug = prog_set.exercise_slug
+            if slug not in exercises_map:
+                exercises_map[slug] = []
+            exercises_map[slug].append(prog_set)
+
+        # Créer les exercices et sets
+        order_index = 0
+        for exercise_slug, sets_list in exercises_map.items():
+            workout_exercise = WorkoutExercise(
+                workout_id=workout.id,
+                exercise_id=exercise_slug,
+                order_index=order_index,
+                planned_sets=len(sets_list),
+            )
+            session.add(workout_exercise)
+            session.flush()
+
+            # Créer les sets
+            for set_index, prog_set in enumerate(sets_list):
+                set_entry = Set(
+                    workout_exercise_id=workout_exercise.id,
+                    reps=prog_set.reps,
+                    weight=prog_set.weight,
+                    rpe=prog_set.rpe,
+                    order=set_index,
+                    created_at=now,
+                    completed=False,
+                )
+                session.add(set_entry)
+            
+            order_index += 1
+
+        workouts_created.append({
+            "id": workout.id,
+            "title": workout.title,
+            "day_index": prog_session.day_index,
+        })
+
+    session.commit()
+
+    return ProgramSaveResponse(
+        program_id=program.id,
+        workouts_created=len(workouts_created),
+        workouts=workouts_created
     )

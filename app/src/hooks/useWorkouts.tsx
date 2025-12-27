@@ -43,6 +43,7 @@ interface WorkoutsContextValue {
   isLoading: boolean;
   refresh: () => Promise<WorkoutWithRelations[]>;
   createDraft: (title?: string) => Promise<WorkoutWithRelations | undefined>;
+  pullFromServer: (since?: number) => Promise<void>;
   pendingMutations: number;
   updateTitle: (id: number, title: string) => Promise<void>;
   addExercise: (workoutId: number, exerciseId: string, plannedSets?: number | null) => Promise<number | undefined>;
@@ -678,6 +679,7 @@ export const WorkoutsProvider = ({ children }: PropsWithChildren) => {
       refresh,
       createDraft,
       pendingMutations: pendingCount,
+      pullFromServer,
       updateTitle: updateTitleAction,
       addExercise: addExerciseAction,
       updateExercisePlan: updateExercisePlanAction,
@@ -696,6 +698,7 @@ export const WorkoutsProvider = ({ children }: PropsWithChildren) => {
       isLoading,
       refresh,
       createDraft,
+      pullFromServer,
       pendingCount,
       updateTitleAction,
       addExerciseAction,

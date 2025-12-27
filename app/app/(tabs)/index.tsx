@@ -1,18 +1,22 @@
 import { useRouter } from 'expo-router';
-import React, { useMemo, useRef, useState } from 'react';
+import React, { useMemo, useRef, useState, useEffect } from 'react';
 import {
   Animated,
   Easing,
   RefreshControl,
   StyleSheet,
   Text,
-  TouchableOpacity,
   View,
   ScrollView,
   Pressable,
+  Modal,
+  TextInput,
+  Alert,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as Haptics from 'expo-haptics';
 
 import { EXERCISE_CATALOG } from '@/src/data/exercises';
 import { useWorkouts } from '@/hooks/useWorkouts';
@@ -26,6 +30,7 @@ import { QuickStatsRow } from '@/components/QuickStatsRow';
 import { NextWorkoutCard } from '@/components/NextWorkoutCard';
 import { WeekChart } from '@/components/WeekChart';
 import { WorkoutCard } from '@/components/WorkoutCard';
+import { AppButton } from '@/components/AppButton';
 
 export default function HomeScreen() {
   const router = useRouter();
@@ -34,8 +39,50 @@ export default function HomeScreen() {
   const { workouts, isLoading, refresh, createDraft, deleteWorkout } = useWorkouts();
   const { theme } = useAppTheme();
   const [menuOpen, setMenuOpen] = useState(false);
+  const [goalSessions, setGoalSessions] = useState(3);
+  const [editGoalModal, setEditGoalModal] = useState(false);
+  const [goalInput, setGoalInput] = useState('3');
   const drawerAnim = useRef(new Animated.Value(0)).current;
   const insets = useSafeAreaInsets();
+
+  // Charger l'objectif sauvegardé
+  useEffect(() => {
+    const loadGoal = async () => {
+      try {
+        const saved = await AsyncStorage.getItem('goal_sessions_per_week');
+        if (saved) {
+          const parsed = parseInt(saved, 10);
+          if (!isNaN(parsed) && parsed > 0) {
+            setGoalSessions(parsed);
+          }
+        }
+      } catch (error) {
+        console.warn('Failed to load goal', error);
+      }
+    };
+    loadGoal();
+  }, []);
+
+  const handleEditGoal = () => {
+    setGoalInput(String(goalSessions));
+    setEditGoalModal(true);
+  };
+
+  const handleSaveGoal = async () => {
+    const parsed = parseInt(goalInput, 10);
+    if (isNaN(parsed) || parsed < 1 || parsed > 14) {
+      Alert.alert('Erreur', 'L\'objectif doit être entre 1 et 14 séances par semaine.');
+      return;
+    }
+    try {
+      await AsyncStorage.setItem('goal_sessions_per_week', String(parsed));
+      setGoalSessions(parsed);
+      setEditGoalModal(false);
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+    } catch (error) {
+      Alert.alert('Erreur', 'Impossible de sauvegarder l\'objectif.');
+    }
+  };
 
   // Calcul des statistiques
   const stats = useMemo(() => {
@@ -192,7 +239,22 @@ export default function HomeScreen() {
     [workouts]
   );
 
-  const recentWorkouts = useMemo(() => workouts.slice(0, 5), [workouts]);
+  // Séparer les séances en deux catégories
+  const createdWorkouts = useMemo(
+    () => workouts
+      .filter((item) => item.workout.status !== 'completed')
+      .sort((a, b) => b.workout.updated_at - a.workout.updated_at)
+      .slice(0, 5),
+    [workouts]
+  );
+
+  const completedWorkouts = useMemo(
+    () => workouts
+      .filter((item) => item.workout.status === 'completed')
+      .sort((a, b) => b.workout.updated_at - a.workout.updated_at)
+      .slice(0, 5),
+    [workouts]
+  );
 
   const quickStats = useMemo(() => {
     const volumeChange = stats.prevVolume7d > 0
@@ -202,11 +264,14 @@ export default function HomeScreen() {
     return [
       {
         id: 'sessions',
-        value: `${stats.completedThisWeek}/3`,
+        value: `${stats.completedThisWeek}/${goalSessions}`,
         label: 'Objectif',
         icon: 'checkmark-circle' as const,
-        trend: stats.completedThisWeek >= 3 ? 'up' : 'neutral' as const,
+        trend: stats.completedThisWeek >= goalSessions ? 'up' : 'neutral' as const,
         color: '#10B981',
+        explanation: `Nombre de séances terminées cette semaine par rapport à ton objectif de ${goalSessions} séances par semaine.`,
+        editable: true,
+        onEdit: handleEditGoal,
       },
       {
         id: 'volume',
@@ -216,6 +281,7 @@ export default function HomeScreen() {
         trend: volumeChange > 0 ? 'up' : volumeChange < 0 ? 'down' : 'neutral' as const,
         trendValue: volumeChange !== 0 ? `${volumeChange > 0 ? '+' : ''}${volumeChange}%` : undefined,
         color: '#667eea',
+        explanation: 'Volume total soulevé cette semaine (poids × répétitions). Compare avec la semaine précédente.',
       },
       {
         id: 'streak',
@@ -224,6 +290,7 @@ export default function HomeScreen() {
         icon: 'flame' as const,
         trend: stats.streak >= 7 ? 'up' : 'neutral' as const,
         color: '#f59e0b',
+        explanation: 'Nombre de jours consécutifs avec au moins une séance terminée. Continue pour maintenir ta série !',
       },
       {
         id: 'total',
@@ -231,9 +298,10 @@ export default function HomeScreen() {
         label: 'Séances totales',
         icon: 'fitness' as const,
         color: '#8b5cf6',
+        explanation: 'Nombre total de séances créées (terminées et brouillons) depuis le début.',
       },
     ];
-  }, [stats]);
+  }, [stats, goalSessions]);
 
   const handleCreate = async () => {
     const draft = await createDraft();
@@ -385,41 +453,53 @@ export default function HomeScreen() {
           </AppCard>
         )}
 
+        {/* Mes séances créées */}
         <View style={styles.sectionContainer}>
           <View style={styles.sectionHeader}>
             <View style={styles.sectionHeaderRow}>
-              <Ionicons name="time-outline" size={18} color={theme.colors.accent} />
-              <Text style={[styles.sectionTitle, { color: theme.colors.textPrimary }]}>
-                Dernières séances
-              </Text>
+              <View style={[styles.sectionIconContainer, { backgroundColor: theme.colors.accent + '20' }]}>
+                <Ionicons name="create-outline" size={18} color={theme.colors.accent} />
+              </View>
+              <View>
+                <Text style={[styles.sectionTitle, { color: theme.colors.textPrimary }]}>
+                  Mes séances créées
+                </Text>
+                <Text style={[styles.sectionSubtitle, { color: theme.colors.textSecondary }]}>
+                  Brouillons et séances en cours
+                </Text>
+              </View>
             </View>
-            <TouchableOpacity onPress={() => router.push('/history')}>
-              <Text style={[styles.seeAllLink, { color: theme.colors.accent }]}>
-                Voir tout
-              </Text>
-            </TouchableOpacity>
+            {createdWorkouts.length > 0 && (
+              <Pressable
+                onPress={() => router.push('/history')}
+                style={({ pressed }) => ({ opacity: pressed ? 0.6 : 1 })}
+              >
+                <Text style={[styles.seeAllLink, { color: theme.colors.accent }]}>
+                  Voir tout
+                </Text>
+              </Pressable>
+            )}
           </View>
 
-          {!recentWorkouts.length ? (
+          {!createdWorkouts.length ? (
             <View style={[styles.emptyState, { backgroundColor: theme.colors.surface, borderColor: theme.colors.border }]}>
-              <View style={[styles.emptyIconContainer, { backgroundColor: theme.colors.surfaceMuted }]}>
-                <Text style={styles.emptyIcon}>🏋️</Text>
+              <View style={[styles.emptyIconContainer, { backgroundColor: theme.colors.accent + '20' }]}>
+                <Ionicons name="document-text-outline" size={32} color={theme.colors.accent} />
               </View>
               <Text style={[styles.emptyTitle, { color: theme.colors.textPrimary }]}>
-                Aucune séance
+                Aucune séance créée
               </Text>
               <Text style={[styles.emptySubtitle, { color: theme.colors.textSecondary }]}>
-                Crée ta première séance pour la retrouver ici
+                Crée ta première séance pour commencer à t'entraîner
               </Text>
-              <TouchableOpacity
-                style={[styles.emptyButton, { backgroundColor: theme.colors.accent }]}
+              <AppButton
+                title="Créer une séance"
                 onPress={handleCreate}
-              >
-                <Text style={styles.emptyButtonText}>Créer une séance</Text>
-              </TouchableOpacity>
+                style={styles.emptyButton}
+              />
             </View>
           ) : (
-            recentWorkouts.map((item) => (
+            createdWorkouts.map((item) => (
               <WorkoutCard
                 key={item.workout.id}
                 title={item.workout.title}
@@ -432,7 +512,129 @@ export default function HomeScreen() {
             ))
           )}
         </View>
+
+        {/* Mes séances passées */}
+        <View style={styles.sectionContainer}>
+          <View style={styles.sectionHeader}>
+            <View style={styles.sectionHeaderRow}>
+              <View style={[styles.sectionIconContainer, { backgroundColor: theme.colors.primaryMuted + '30' }]}>
+                <Ionicons name="checkmark-circle-outline" size={18} color={theme.colors.primaryMuted} />
+              </View>
+              <View>
+                <Text style={[styles.sectionTitle, { color: theme.colors.textPrimary }]}>
+                  Mes séances passées
+                </Text>
+                <Text style={[styles.sectionSubtitle, { color: theme.colors.textSecondary }]}>
+                  Séances terminées
+                </Text>
+              </View>
+            </View>
+            {completedWorkouts.length > 0 && (
+              <Pressable
+                onPress={() => router.push('/history')}
+                style={({ pressed }) => ({ opacity: pressed ? 0.6 : 1 })}
+              >
+                <Text style={[styles.seeAllLink, { color: theme.colors.accent }]}>
+                  Voir tout
+                </Text>
+              </Pressable>
+            )}
+          </View>
+
+          {!completedWorkouts.length ? (
+            <View style={[styles.emptyState, { backgroundColor: theme.colors.surface, borderColor: theme.colors.border }]}>
+              <View style={[styles.emptyIconContainer, { backgroundColor: theme.colors.primaryMuted + '20' }]}>
+                <Ionicons name="trophy-outline" size={32} color={theme.colors.primaryMuted} />
+              </View>
+              <Text style={[styles.emptyTitle, { color: theme.colors.textPrimary }]}>
+                Aucune séance terminée
+              </Text>
+              <Text style={[styles.emptySubtitle, { color: theme.colors.textSecondary }]}>
+                Termine une séance pour la voir apparaître ici
+              </Text>
+            </View>
+          ) : (
+            completedWorkouts.map((item) => (
+              <WorkoutCard
+                key={item.workout.id}
+                title={item.workout.title}
+                date={formatDate(item.workout.updated_at)}
+                status={item.workout.status as 'draft' | 'completed' | 'in_progress'}
+                exerciseCount={item.exercises?.length}
+                onPress={() => router.push(`/history/${item.workout.id}`)}
+                onDelete={() => deleteWorkout(item.workout.id)}
+              />
+            ))
+          )}
+        </View>
       </ScrollView>
+
+      {/* Modal pour éditer l'objectif */}
+      <Modal
+        visible={editGoalModal}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setEditGoalModal(false)}
+      >
+        <Pressable
+          style={styles.modalOverlay}
+          onPress={() => setEditGoalModal(false)}
+        >
+          <Pressable
+            style={[styles.goalModalCard, { backgroundColor: theme.colors.surface, borderColor: theme.colors.border }]}
+            onPress={(e) => e.stopPropagation()}
+          >
+            <View style={styles.goalModalHeader}>
+              <Text style={[styles.goalModalTitle, { color: theme.colors.textPrimary }]}>
+                Objectif hebdomadaire
+              </Text>
+              <Pressable
+                onPress={() => setEditGoalModal(false)}
+                style={styles.closeButton}
+              >
+                <Ionicons name="close" size={24} color={theme.colors.textSecondary} />
+              </Pressable>
+            </View>
+            <Text style={[styles.goalModalDescription, { color: theme.colors.textSecondary }]}>
+              Combien de séances veux-tu faire par semaine ?
+            </Text>
+            <TextInput
+              style={[styles.goalInput, {
+                backgroundColor: theme.colors.surfaceMuted,
+                borderColor: theme.colors.border,
+                color: theme.colors.textPrimary,
+              }]}
+              value={goalInput}
+              onChangeText={setGoalInput}
+              keyboardType="number-pad"
+              placeholder="3"
+              placeholderTextColor={theme.colors.textSecondary}
+              autoFocus
+            />
+            <View style={styles.goalModalActions}>
+              <Pressable
+                style={[styles.goalModalButton, styles.goalModalButtonSecondary, {
+                  backgroundColor: theme.colors.surfaceMuted,
+                  borderColor: theme.colors.border,
+                }]}
+                onPress={() => setEditGoalModal(false)}
+              >
+                <Text style={[styles.goalModalButtonText, { color: theme.colors.textPrimary }]}>
+                  Annuler
+                </Text>
+              </Pressable>
+              <Pressable
+                style={[styles.goalModalButton, { backgroundColor: theme.colors.accent }]}
+                onPress={handleSaveGoal}
+              >
+                <Text style={[styles.goalModalButtonText, { color: '#FFFFFF' }]}>
+                  Enregistrer
+                </Text>
+              </Pressable>
+            </View>
+          </Pressable>
+        </Pressable>
+      </Modal>
 
       {/* Drawer Menu */}
       {menuOpen && (
@@ -446,9 +648,12 @@ export default function HomeScreen() {
           >
             <View style={styles.drawerHeader}>
               <Text style={[styles.drawerTitle, { color: theme.colors.textPrimary }]}>Menu</Text>
-              <TouchableOpacity onPress={closeMenu}>
+              <Pressable
+                onPress={closeMenu}
+                style={({ pressed }) => ({ opacity: pressed ? 0.6 : 1 })}
+              >
                 <Ionicons name="close" size={24} color={theme.colors.textPrimary} />
-              </TouchableOpacity>
+              </Pressable>
             </View>
             
             <View style={styles.drawerSection}>
@@ -456,16 +661,19 @@ export default function HomeScreen() {
                 Navigation
               </Text>
               {menuItems.map((item) => (
-                <TouchableOpacity
+                <Pressable
                   key={item.route}
-                  style={styles.drawerItem}
+                  style={({ pressed }) => [
+                    styles.drawerItem,
+                    { opacity: pressed ? 0.6 : 1 },
+                  ]}
                   onPress={() => goTo(item.route)}
                 >
                   <Ionicons name={item.icon} size={20} color={theme.colors.textPrimary} />
                   <Text style={[styles.drawerItemText, { color: theme.colors.textPrimary }]}>
                     {item.label}
                   </Text>
-                </TouchableOpacity>
+                </Pressable>
               ))}
             </View>
 
@@ -474,9 +682,12 @@ export default function HomeScreen() {
                 Actions
               </Text>
               {actionItems.map((item) => (
-                <TouchableOpacity
+                <Pressable
                   key={item.label}
-                  style={styles.drawerItem}
+                  style={({ pressed }) => [
+                    styles.drawerItem,
+                    { opacity: pressed ? 0.6 : 1 },
+                  ]}
                   onPress={() => {
                     item.action();
                     closeMenu();
@@ -486,7 +697,7 @@ export default function HomeScreen() {
                   <Text style={[styles.drawerItemText, { color: theme.colors.textPrimary }]}>
                     {item.label}
                   </Text>
-                </TouchableOpacity>
+                </Pressable>
               ))}
             </View>
           </Animated.View>
@@ -508,17 +719,30 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 14,
+    marginBottom: 16,
   },
   sectionHeaderRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    gap: 12,
+    flex: 1,
+  },
+  sectionIconContainer: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   sectionTitle: {
     fontSize: 18,
     fontWeight: '700',
     letterSpacing: -0.3,
+    marginBottom: 2,
+  },
+  sectionSubtitle: {
+    fontSize: 12,
+    fontWeight: '500',
   },
   seeAllLink: {
     fontSize: 14,
@@ -527,7 +751,7 @@ const styles = StyleSheet.create({
   muscleRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginTop: 12,
+    marginTop: 16,
     gap: 12,
   },
   muscleLabel: {
@@ -551,8 +775,8 @@ const styles = StyleSheet.create({
     textAlign: 'right',
   },
   emptyState: {
-    padding: 32,
-    borderRadius: 20,
+    padding: 24,
+    borderRadius: 16,
     borderWidth: StyleSheet.hairlineWidth,
     alignItems: 'center',
     gap: 12,
@@ -563,7 +787,7 @@ const styles = StyleSheet.create({
     borderRadius: 32,
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 8,
+    marginBottom: 12,
   },
   emptyIcon: {
     fontSize: 28,
@@ -578,15 +802,7 @@ const styles = StyleSheet.create({
     lineHeight: 20,
   },
   emptyButton: {
-    paddingHorizontal: 24,
-    paddingVertical: 12,
-    borderRadius: 12,
-    marginTop: 8,
-  },
-  emptyButtonText: {
-    color: '#FFFFFF',
-    fontSize: 15,
-    fontWeight: '600',
+    marginTop: 12,
   },
   overlay: {
     ...StyleSheet.absoluteFillObject,
@@ -634,5 +850,64 @@ const styles = StyleSheet.create({
   drawerItemText: {
     fontSize: 16,
     fontWeight: '600',
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  goalModalCard: {
+    borderRadius: 20,
+    padding: 24,
+    borderWidth: 1,
+    maxWidth: 400,
+    width: '100%',
+  },
+  goalModalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  goalModalTitle: {
+    fontSize: 20,
+    fontWeight: '700',
+  },
+  closeButton: {
+    padding: 4,
+  },
+  goalModalDescription: {
+    fontSize: 14,
+    marginBottom: 16,
+    lineHeight: 20,
+  },
+  goalInput: {
+    borderRadius: 12,
+    padding: 16,
+    fontSize: 18,
+    fontWeight: '600',
+    borderWidth: 1,
+    textAlign: 'center',
+    marginBottom: 20,
+  },
+  goalModalActions: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  goalModalButton: {
+    flex: 1,
+    paddingVertical: 14,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  goalModalButtonSecondary: {
+    borderWidth: 1,
+  },
+  goalModalButtonText: {
+    fontSize: 16,
+    fontWeight: '700',
   },
 });

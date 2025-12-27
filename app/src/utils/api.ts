@@ -5,13 +5,13 @@ import { Platform } from 'react-native';
 const CLOUD_API_URL = 'https://appli-v2.onrender.com';
 
 // Pour le dev local
-const LOCAL_API_IP = 'http://192.168.1.153:8000';  // Pour mobile via Expo Go
+const LOCAL_API_IP = 'http://192.168.1.111:8000';  // Pour mobile via Expo Go
 const LOCAL_API_WEB = 'http://localhost:8000';     // Pour navigateur web
 
 // Toggle pour basculer entre local et cloud
 // ⚠️ Pour APK/Production: mettre à false
 // ⚠️ Pour Expo Go local: mettre à true
-const USE_LOCAL_API = __DEV__ ? true : false;
+const USE_LOCAL_API = __DEV__ ? false : false; // Désactivé pour utiliser l'API cloud
 
 export const getApiBaseUrl = () => {
   // Mode dev local activé (seulement en développement)

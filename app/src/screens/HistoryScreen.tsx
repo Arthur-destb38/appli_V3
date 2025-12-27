@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Animated,
   Easing,
@@ -7,15 +7,18 @@ import {
   RefreshControl,
   StyleSheet,
   Text,
-  TouchableOpacity,
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-
+import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from 'expo-router';
+import * as Haptics from 'expo-haptics';
 
 import { fetchWorkouts, WorkoutWithRelations } from '@/db/workouts-repository';
 import { useAppTheme } from '@/theme/ThemeProvider';
+import { LoadingState, ErrorState, EmptyState } from '@/components/StateView';
+import { HistoryProgressChart } from '@/components/HistoryProgressChart';
+import { ExerciseChargesChart } from '@/components/ExerciseChargesChart';
 
 type HistoryItem = {
   id: number;
@@ -70,6 +73,7 @@ export const HistoryScreen: React.FC = () => {
   const insets = useSafeAreaInsets();
   const [data, setData] = useState<HistoryItem[]>([]);
   const [filtered, setFiltered] = useState<HistoryItem[]>([]);
+  const [rawWorkouts, setRawWorkouts] = useState<WorkoutWithRelations[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
@@ -80,6 +84,7 @@ export const HistoryScreen: React.FC = () => {
     try {
       setError(null);
       const workouts = await fetchWorkouts();
+      setRawWorkouts(workouts);
       const items = workouts.map(mapToHistoryItem);
       setData(items);
       setFiltered(items);
@@ -100,19 +105,49 @@ export const HistoryScreen: React.FC = () => {
     setRefreshing(false);
   }, [load]);
 
-  const renderItem = useCallback(
-    ({ item }: { item: HistoryItem }) => (
-      <TouchableOpacity
-        style={[
-          styles.card,
-          {
-            backgroundColor: theme.colors.surface,
-            borderColor: theme.colors.border,
-            shadowColor: theme.colors.border,
-          },
-        ]}
-        onPress={() => navigation.navigate('history/[id]' as never, { id: item.id } as never)}
+  const HistoryCard: React.FC<{ item: HistoryItem; index: number }> = ({ item, index }) => {
+    const cardAnim = useRef(new Animated.Value(0)).current;
+    
+    useEffect(() => {
+      Animated.timing(cardAnim, {
+        toValue: 1,
+        duration: 400,
+        delay: index * 50,
+        easing: Easing.out(Easing.back(1.1)),
+        useNativeDriver: true,
+      }).start();
+    }, [cardAnim, index]);
+    
+    return (
+      <Animated.View
+        style={{
+          opacity: cardAnim,
+          transform: [
+            {
+              translateY: cardAnim.interpolate({
+                inputRange: [0, 1],
+                outputRange: [30, 0],
+              }),
+            },
+          ],
+        }}
       >
+        <Pressable
+          style={({ pressed }) => [
+            styles.card,
+            {
+              backgroundColor: theme.colors.surface,
+              borderColor: theme.colors.border,
+              shadowColor: theme.colors.border,
+              opacity: pressed ? 0.9 : 1,
+              transform: [{ scale: pressed ? 0.98 : 1 }],
+            },
+          ]}
+          onPress={() => {
+            Haptics.selectionAsync().catch(() => {});
+            navigation.navigate('history/[id]' as never, { id: item.id } as never);
+          }}
+        >
         <View style={styles.cardHeader}>
           <View>
             <Text style={[styles.cardTitle, { color: theme.colors.textPrimary }]} numberOfLines={1}>
@@ -149,13 +184,63 @@ export const HistoryScreen: React.FC = () => {
             <Text style={[styles.statLabel, { color: theme.colors.textSecondary }]}>kg</Text>
           </View>
         </View>
-        {item.synced ? (
-          <Text style={[styles.synced, { color: theme.colors.accent }]}>Synchronisée</Text>
-        ) : null}
-      </TouchableOpacity>
+          {item.synced ? (
+            <View style={styles.syncedRow}>
+              <Ionicons name="checkmark-circle" size={14} color={theme.colors.accent} />
+              <Text style={[styles.synced, { color: theme.colors.accent }]}>Synchronisée</Text>
+            </View>
+          ) : null}
+        </Pressable>
+      </Animated.View>
+    );
+  };
+
+  const renderItem = useCallback(
+    ({ item, index }: { item: HistoryItem; index: number }) => (
+      <HistoryCard item={item} index={index} />
     ),
-    [navigation, theme.colors.surface, theme.colors.border, theme.colors.surfaceMuted, theme.colors.textPrimary, theme.colors.textSecondary, theme.colors.accent]
+    [navigation, theme]
   );
+
+  // Calculer les données hebdomadaires pour le graphique
+  const weeklyData = useMemo(() => {
+    const now = Date.now();
+    const weeks: { [key: string]: { volume: number; count: number; label: string } } = {};
+    
+    // Grouper par semaine (8 dernières semaines)
+    data.forEach((item) => {
+      const date = new Date(item.date);
+      const weekStart = new Date(date);
+      weekStart.setDate(date.getDate() - date.getDay()); // Dimanche de la semaine
+      weekStart.setHours(0, 0, 0, 0);
+      
+      const weekKey = weekStart.getTime();
+      const weekLabel = `${weekStart.getDate()}/${weekStart.getMonth() + 1}`;
+      
+      if (!weeks[weekKey]) {
+        weeks[weekKey] = { volume: 0, count: 0, label: weekLabel };
+      }
+      
+      weeks[weekKey].volume += item.volume;
+      weeks[weekKey].count += 1;
+    });
+    
+    // Convertir en tableau et trier par date
+    const sortedWeeks = Object.entries(weeks)
+      .map(([key, value]) => ({
+        weekKey: Number(key),
+        ...value,
+      }))
+      .sort((a, b) => a.weekKey - b.weekKey)
+      .slice(-8); // Garder les 8 dernières semaines
+    
+    // Formater pour le graphique
+    return sortedWeeks.map((week, index) => ({
+      week: `Sem ${index + 1}`,
+      value: week.volume,
+      label: week.label,
+    }));
+  }, [data]);
 
   useEffect(() => {
     const now = Date.now();
@@ -189,30 +274,19 @@ export const HistoryScreen: React.FC = () => {
 
   const content = useMemo(() => {
     if (isLoading) {
-      return (
-        <View style={styles.centered}>
-          <Text>Chargement en cours…</Text>
-        </View>
-      );
+      return <LoadingState message="Chargement de l'historique..." />;
     }
 
     if (error) {
-      return (
-        <View style={styles.centered}>
-          <Text style={styles.error}>{error}</Text>
-          <TouchableOpacity onPress={load} style={styles.retryButton}>
-            <Text style={styles.retryText}>Réessayer</Text>
-          </TouchableOpacity>
-        </View>
-      );
+      return <ErrorState message={error} onRetry={load} />;
     }
 
     if (!filtered.length) {
       return (
-        <View style={styles.centered}>
-          <Text style={styles.emptyTitle}>Aucune séance encore</Text>
-          <Text style={styles.emptySubtitle}>Crée une séance pour voir ton historique apparaître ici.</Text>
-        </View>
+        <EmptyState
+          title="Aucune séance encore"
+          subtitle="Crée une séance pour voir ton historique apparaître ici"
+        />
       );
     }
 
@@ -223,13 +297,36 @@ export const HistoryScreen: React.FC = () => {
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
         renderItem={renderItem}
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={[styles.listContent, { paddingTop: 64 }]}
+        contentContainerStyle={styles.listContent}
+        ItemSeparatorComponent={() => <View style={{ height: 12 }} />}
+        ListHeaderComponent={
+          <>
+            {weeklyData.length > 0 && (
+              <View style={styles.chartWrapper}>
+                <HistoryProgressChart
+                  data={weeklyData}
+                  title="Progression hebdomadaire"
+                  unit="kg"
+                  type="volume"
+                />
+              </View>
+            )}
+            {rawWorkouts.length > 0 && (
+              <View style={styles.chartWrapper}>
+                <ExerciseChargesChart
+                  workouts={rawWorkouts}
+                  title="Charges par exercice"
+                />
+              </View>
+            )}
+          </>
+        }
       />
     );
-  }, [error, filtered, isLoading, onRefresh, renderItem, refreshing, load]);
+  }, [error, filtered, isLoading, onRefresh, renderItem, refreshing, load, weeklyData, rawWorkouts]);
 
   return (
-    <View style={[styles.container, { backgroundColor: theme.colors.background, paddingTop: insets.top + 12 }] }>
+    <View style={[styles.container, { backgroundColor: theme.colors.background, paddingTop: insets.top }] }>
       <View style={[styles.screenHeader, { backgroundColor: theme.colors.surface }]}> 
         <Text style={[styles.screenTitle, { color: theme.colors.textPrimary }]}>Historique</Text>
         <Text style={[styles.screenSubtitle, { color: theme.colors.textSecondary }]}> 
@@ -249,24 +346,26 @@ const styles = StyleSheet.create({
   },
   listContent: {
     paddingHorizontal: 16,
+    paddingTop: 16,
     paddingBottom: 16,
-    gap: 12,
+  },
+  chartWrapper: {
+    marginBottom: 12,
   },
   screenHeader: {
     paddingHorizontal: 16,
-    paddingTop: 12,
+    paddingTop: 16,
     paddingBottom: 16,
     borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: '#E2E8F0',
-    marginBottom: 8,
   },
   screenTitle: {
     fontSize: 28,
     fontWeight: '700',
+    marginBottom: 4,
   },
   screenSubtitle: {
     fontSize: 14,
-    marginTop: 4,
   },
   card: {
     borderRadius: 16,
@@ -276,12 +375,13 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 4 },
     shadowRadius: 8,
     elevation: 2,
-    gap: 8,
+    gap: 12,
   },
   cardHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
+    marginBottom: 4,
   },
   cardTitle: {
     fontSize: 18,
@@ -289,13 +389,11 @@ const styles = StyleSheet.create({
   },
   subtitle: {
     fontSize: 14,
-  },
-  meta: {
-    fontSize: 12,
+    marginTop: 4,
   },
   badge: {
     paddingHorizontal: 12,
-    paddingVertical: 4,
+    paddingVertical: 6,
     borderRadius: 999,
     borderWidth: 1,
   },
@@ -303,34 +401,14 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '700',
   },
+  syncedRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginTop: 4,
+  },
   synced: {
     fontSize: 12,
-    fontWeight: '600',
-  },
-  centered: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: 32,
-    gap: 12,
-  },
-  emptyTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-  },
-  emptySubtitle: {
-    fontSize: 14,
-    textAlign: 'center',
-  },
-  error: {
-    fontWeight: '600',
-  },
-  retryButton: {
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 12,
-  },
-  retryText: {
     fontWeight: '600',
   },
   statsRow: {
@@ -341,7 +419,7 @@ const styles = StyleSheet.create({
   statPill: {
     flex: 1,
     borderRadius: 12,
-    paddingVertical: 10,
+    paddingVertical: 12,
     alignItems: 'center',
   },
   statValue: {
@@ -352,5 +430,6 @@ const styles = StyleSheet.create({
     fontSize: 11,
     textTransform: 'uppercase',
     letterSpacing: 0.6,
+    marginTop: 4,
   },
 });
