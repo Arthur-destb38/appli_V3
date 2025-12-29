@@ -6,10 +6,9 @@ import * as Haptics from 'expo-haptics';
 import { AppButton } from '@/components/AppButton';
 import { AppCard } from '@/components/AppCard';
 import { useAppTheme } from '@/theme/ThemeProvider';
-import { generateProgram, saveProgram } from '@/services/programsApi';
+import { generateProgram } from '@/services/programsApi';
 import { Program } from '@/types/program';
 import { useWorkouts } from '@/hooks/useWorkouts';
-import { useAuth } from '@/hooks/useAuth';
 import { useRouter } from 'expo-router';
 
 const CreateProgramScreen: React.FC = () => {
@@ -23,10 +22,7 @@ const CreateProgramScreen: React.FC = () => {
   const [program, setProgram] = useState<Program | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [launchingSession, setLaunchingSession] = useState<number | null>(null);
-  const [savingSessions, setSavingSessions] = useState(false);
-  const [programSaved, setProgramSaved] = useState(false);
-  const { createDraft, addExercise, addSet, refresh, pullFromServer } = useWorkouts();
-  const { user, isAuthenticated } = useAuth();
+  const { createDraft, addExercise, addSet } = useWorkouts();
   const router = useRouter();
   
   // Nouveaux états pour les paramètres V1
@@ -102,75 +98,6 @@ const CreateProgramScreen: React.FC = () => {
       }
     }
     return 10;
-  };
-
-  const handleSaveAllSessions = async () => {
-    if (!program?.id) {
-      Alert.alert('Erreur', 'Programme introuvable');
-      return;
-    }
-
-    if (!isAuthenticated) {
-      Alert.alert('Connexion requise', 'Tu dois être connecté pour enregistrer les séances.');
-      return;
-    }
-
-    Haptics.selectionAsync().catch(() => {});
-    setSavingSessions(true);
-    try {
-      // Sauvegarder le programme sur le serveur (crée les workouts sur le serveur)
-      const result = await saveProgram(String(program.id));
-      
-      // Créer les workouts localement avec tous leurs exercices et sets
-      for (const workoutData of result.workouts) {
-        // Trouver la session correspondante dans le programme
-        const session = program.sessions.find((s) => s.day_index === workoutData.day_index);
-        if (!session) continue;
-
-        // Créer le workout localement normalement (sans server_id pour l'instant)
-        const draft = await createDraft(workoutData.title);
-        if (!draft) continue;
-
-        // Regrouper les sets par exercice
-        const grouped = session.sets.reduce<Record<string, typeof session.sets>>((acc, set) => {
-          const key = set.exercise_slug || 'exercice';
-          acc[key] = acc[key] ? [...acc[key], set] : [set];
-          return acc;
-        }, {});
-
-        // Créer les exercices et sets localement
-        for (const [slug, sets] of Object.entries(grouped)) {
-          const exerciseId = await addExercise(draft.workout.id, slug, sets.length);
-          if (!exerciseId) continue;
-          
-          for (const s of sets) {
-            await addSet(exerciseId, {
-              reps: parseReps(s.reps),
-              weight: typeof s.weight === 'number' ? s.weight : null,
-              rpe: typeof s.rpe === 'number' ? s.rpe : null,
-            });
-          }
-        }
-      }
-      
-      // Déclencher une synchronisation pour associer les workouts locaux aux workouts serveur
-      if (pullFromServer) {
-        await pullFromServer();
-      }
-      
-      setProgramSaved(true);
-      await refresh(); // Rafraîchir les workouts pour voir les nouvelles séances
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
-      Alert.alert(
-        'Séances enregistrées !',
-        `${result.workouts_created} séance${result.workouts_created > 1 ? 's' : ''} ${result.workouts_created > 1 ? 'ont été' : 'a été'} enregistrée${result.workouts_created > 1 ? 's' : ''} et synchronisée${result.workouts_created > 1 ? 's' : ''}. Tu peux les retrouver dans tes séances.`
-      );
-    } catch (err: any) {
-      Alert.alert('Erreur', err?.message || "Impossible d'enregistrer les séances");
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error).catch(() => {});
-    } finally {
-      setSavingSessions(false);
-    }
   };
 
   const handleStartSession = async (sess: Program['sessions'][number], modeSport = false) => {
@@ -558,13 +485,30 @@ const CreateProgramScreen: React.FC = () => {
           </View>
         </View>
 
-        <AppButton
-          title="Générer un programme"
+        <Pressable
+          style={({ pressed }) => [
+            styles.ctaButton,
+            {
+              backgroundColor: theme.colors.accent,
+              opacity: loading || pressed ? 0.8 : 1,
+              transform: [{ scale: pressed ? 0.98 : 1 }],
+            },
+          ]}
           onPress={handleGenerate}
-          loading={loading}
           disabled={loading}
-          style={styles.ctaButton}
-        />
+        >
+          {loading ? (
+            <View style={styles.buttonContent}>
+              <ActivityIndicator color="#FFFFFF" size="small" />
+              <Text style={styles.ctaButtonText}>Génération...</Text>
+            </View>
+          ) : (
+            <View style={styles.buttonContent}>
+              <Ionicons name="sparkles" size={20} color="#FFFFFF" />
+              <Text style={styles.ctaButtonText}>Générer un programme</Text>
+            </View>
+          )}
+        </Pressable>
         {error ? (
           <View style={styles.errorContainer}>
             <Ionicons name="alert-circle" size={18} color={theme.colors.error} />
@@ -577,161 +521,127 @@ const CreateProgramScreen: React.FC = () => {
         <AppCard>
           <View style={styles.programHeader}>
             <View style={styles.programHeaderLeft}>
-              <View style={[styles.programIconContainer, { backgroundColor: theme.colors.accent + '20' }]}>
-                <Ionicons name="fitness" size={24} color={theme.colors.accent} />
-              </View>
-              <View style={styles.programInfo}>
+              <Ionicons name="fitness" size={24} color={theme.colors.accent} />
+              <View>
                 <Text style={[styles.programTitle, { color: theme.colors.textPrimary }]}>
                   {program.title}
                 </Text>
-                <View style={styles.programMetaRow}>
-                  <View style={styles.programMetaItem}>
-                    <Ionicons name="flag-outline" size={12} color={theme.colors.textSecondary} />
-                    <Text style={[styles.programSubtitle, { color: theme.colors.textSecondary }]}>
-                      {program.objective || 'Général'}
+                <Text style={[styles.programSubtitle, { color: theme.colors.textSecondary }]}>
+                  {program.objective || 'Général'} • {program.duration_weeks} semaine(s)
+                </Text>
+              </View>
+            </View>
+            <View style={[styles.badge, { backgroundColor: theme.colors.accent + '20' }]}>
+              <Ionicons name="calendar" size={14} color={theme.colors.accent} />
+              <Text style={[styles.badgeText, { color: theme.colors.accent }]}>
+                {program.sessions.length} séances
+              </Text>
+            </View>
+          </View>
+
+          {program.sessions.map((sess, index) => (
+            <View
+              key={sess.day_index}
+              style={[
+                styles.session,
+                {
+                  borderColor: theme.colors.border,
+                  backgroundColor: theme.colors.surface,
+                },
+              ]}
+            >
+              <View style={styles.sessionHeader}>
+                <View style={styles.sessionHeaderLeft}>
+                  <View style={[styles.sessionNumber, { backgroundColor: theme.colors.accent + '20' }]}>
+                    <Text style={[styles.sessionNumberText, { color: theme.colors.accent }]}>
+                      {index + 1}
                     </Text>
                   </View>
-                  <View style={styles.programMetaItem}>
-                    <Ionicons name="calendar-outline" size={12} color={theme.colors.textSecondary} />
-                    <Text style={[styles.programSubtitle, { color: theme.colors.textSecondary }]}>
-                      {program.duration_weeks} semaine{program.duration_weeks > 1 ? 's' : ''}
+                  <View style={styles.sessionInfo}>
+                    <Text style={[styles.sessionTitle, { color: theme.colors.textPrimary }]}>
+                      {sess.title}
                     </Text>
-                  </View>
-                  <View style={styles.programMetaItem}>
-                    <Ionicons name="barbell-outline" size={12} color={theme.colors.textSecondary} />
-                    <Text style={[styles.programSubtitle, { color: theme.colors.textSecondary }]}>
-                      {program.sessions.length} séance{program.sessions.length > 1 ? 's' : ''}
-                    </Text>
+                    <View style={styles.sessionFocusRow}>
+                      <Ionicons name="barbell-outline" size={14} color={theme.colors.textSecondary} />
+                      <Text style={[styles.sessionFocus, { color: theme.colors.textSecondary }]}>
+                        {sess.focus}
+                      </Text>
+                    </View>
                   </View>
                 </View>
               </View>
-            </View>
-            {programSaved && (
-              <View style={[styles.savedBadge, { backgroundColor: theme.colors.primaryMuted + '30' }]}>
-                <Ionicons name="checkmark-circle" size={16} color={theme.colors.primaryMuted} />
-                <Text style={[styles.savedBadgeText, { color: theme.colors.primaryMuted }]}>
-                  Enregistré
-                </Text>
-              </View>
-            )}
-          </View>
-
-          {isAuthenticated && !programSaved && (
-            <AppButton
-              title="Enregistrer toutes les séances"
-              onPress={handleSaveAllSessions}
-              loading={savingSessions}
-              disabled={savingSessions}
-              variant="secondary"
-              style={styles.saveAllButton}
-            />
-          )}
-
-          {program.sessions.map((sess, index) => {
-            const SessionCard: React.FC<{ session: typeof sess; sessionIndex: number }> = ({ session, sessionIndex }) => {
-              const cardAnim = useRef(new Animated.Value(0)).current;
-
-              useEffect(() => {
-                Animated.timing(cardAnim, {
-                  toValue: 1,
-                  duration: 400,
-                  delay: sessionIndex * 100,
-                  easing: Easing.out(Easing.back(1.1)),
-                  useNativeDriver: true,
-                }).start();
-              }, [cardAnim, sessionIndex]);
-
-              return (
-                <Animated.View
-                  style={{
-                    opacity: cardAnim,
-                    transform: [
-                      {
-                        translateY: cardAnim.interpolate({
-                          inputRange: [0, 1],
-                          outputRange: [30, 0],
-                        }),
-                      },
-                    ],
-                  }}
-                >
-                  <View
-                    style={[
-                      styles.session,
-                      {
-                        borderColor: theme.colors.border,
-                        backgroundColor: theme.colors.surface,
-                      },
-                    ]}
-                  >
-                    <View style={styles.sessionHeader}>
-                      <View style={styles.sessionHeaderLeft}>
-                        <View style={[styles.sessionNumber, { backgroundColor: theme.colors.accent + '20' }]}>
-                          <Text style={[styles.sessionNumberText, { color: theme.colors.accent }]}>
-                            {sessionIndex + 1}
-                          </Text>
-                        </View>
-                        <View style={styles.sessionInfo}>
-                          <Text style={[styles.sessionTitle, { color: theme.colors.textPrimary }]}>
-                            {session.title}
-                          </Text>
-                          <View style={styles.sessionFocusRow}>
-                            <Ionicons name="barbell-outline" size={14} color={theme.colors.textSecondary} />
-                            <Text style={[styles.sessionFocus, { color: theme.colors.textSecondary }]}>
-                              {session.focus}
-                            </Text>
-                          </View>
-                        </View>
-                      </View>
-                    </View>
-                    
-                    <View style={styles.exercisesList}>
-                      {session.sets.slice(0, 3).map((s) => (
-                        <View key={`${session.day_index}-${s.order_index}`} style={styles.exerciseItem}>
-                          <View style={[styles.exerciseBullet, { backgroundColor: theme.colors.accent }]} />
-                          <View style={styles.exerciseContent}>
-                            <Text style={[styles.exerciseName, { color: theme.colors.textPrimary }]} numberOfLines={1}>
-                              {s.exercise_slug.replace(/-/g, ' ')}
-                            </Text>
-                            <Text style={[styles.exerciseMeta, { color: theme.colors.textSecondary }]}>
-                              {typeof s.reps === 'number' ? `${s.reps} reps` : s.reps}
-                            </Text>
-                          </View>
-                        </View>
-                      ))}
-                      {session.sets.length > 3 && (
-                        <View style={styles.moreExercisesContainer}>
-                          <Text style={[styles.moreExercises, { color: theme.colors.textSecondary }]}>
-                            + {session.sets.length - 3} exercice{session.sets.length - 3 > 1 ? 's' : ''}
-                          </Text>
-                        </View>
-                      )}
-                    </View>
-                    
-                    <View style={styles.sessionActions}>
-                      <AppButton
-                        title="Mode sport"
-                        onPress={() => handleStartSession(session, true)}
-                        loading={launchingSession === session.day_index}
-                        disabled={launchingSession !== null}
-                        variant="secondary"
-                        style={styles.startButton}
-                      />
-                      <AppButton
-                        title="Démarrer"
-                        onPress={() => handleStartSession(session, false)}
-                        loading={launchingSession === session.day_index}
-                        disabled={launchingSession !== null}
-                        style={styles.startButton}
-                      />
-                    </View>
+              
+              <View style={styles.exercisesList}>
+                {sess.sets.slice(0, 3).map((s) => (
+                  <View key={`${sess.day_index}-${s.order_index}`} style={styles.exerciseItem}>
+                    <Ionicons name="ellipse" size={6} color={theme.colors.accent} />
+                    <Text style={[styles.exerciseName, { color: theme.colors.textPrimary }]}>
+                      {s.exercise_slug.replace(/-/g, ' ')}
+                    </Text>
+                    <Text style={[styles.exerciseMeta, { color: theme.colors.textSecondary }]}>
+                      {typeof s.reps === 'number' ? `${s.reps} reps` : s.reps}
+                    </Text>
                   </View>
-                </Animated.View>
-              );
-            };
-
-            return <SessionCard key={sess.day_index} session={sess} sessionIndex={index} />;
-          })}
+                ))}
+                {sess.sets.length > 3 && (
+                  <Text style={[styles.moreExercises, { color: theme.colors.textSecondary }]}>
+                    + {sess.sets.length - 3} exercices
+                  </Text>
+                )}
+              </View>
+              
+              <View style={styles.sessionActions}>
+                <Pressable
+                  style={({ pressed }) => [
+                    styles.startButton,
+                    styles.startButtonSecondary,
+                    {
+                      backgroundColor: theme.colors.surfaceMuted,
+                      borderColor: theme.colors.border,
+                      opacity: launchingSession !== null || pressed ? 0.7 : 1,
+                      transform: [{ scale: pressed ? 0.98 : 1 }],
+                    },
+                  ]}
+                  onPress={() => handleStartSession(sess, true)}
+                  disabled={launchingSession !== null}
+                >
+                  {launchingSession === sess.day_index ? (
+                    <ActivityIndicator color={theme.colors.accent} size="small" />
+                  ) : (
+                    <>
+                      <Ionicons name="flash" size={16} color={theme.colors.accent} />
+                      <Text style={[styles.startButtonText, { color: theme.colors.accent }]}>
+                        Mode sport
+                      </Text>
+                    </>
+                  )}
+                </Pressable>
+                <Pressable
+                  style={({ pressed }) => [
+                    styles.startButton,
+                    {
+                      backgroundColor: theme.colors.accent,
+                      opacity: launchingSession !== null || pressed ? 0.8 : 1,
+                      transform: [{ scale: pressed ? 0.98 : 1 }],
+                    },
+                  ]}
+                  onPress={() => handleStartSession(sess, false)}
+                  disabled={launchingSession !== null}
+                >
+                  {launchingSession === sess.day_index ? (
+                    <ActivityIndicator color="#FFFFFF" size="small" />
+                  ) : (
+                    <>
+                      <Ionicons name="play" size={16} color="#FFFFFF" />
+                      <Text style={[styles.startButtonText, { color: '#FFFFFF' }]}>
+                        Démarrer
+                      </Text>
+                    </>
+                  )}
+                </Pressable>
+              </View>
+            </View>
+          ))}
         </AppCard>
       )}
     </ScrollView>
@@ -828,156 +738,12 @@ const styles = StyleSheet.create({
     fontSize: 13,
     marginTop: 4,
   },
-  errorContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    marginTop: 12,
-    padding: 12,
-    borderRadius: 12,
-    backgroundColor: '#FEE2E2',
-  },
   errorText: {
+    marginTop: 8,
     fontSize: 14,
-    fontWeight: '600',
-    flex: 1,
   },
   ctaButton: {
     marginTop: 12,
-  },
-  programHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    marginBottom: 16,
-    gap: 12,
-  },
-  programHeaderLeft: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: 12,
-    flex: 1,
-  },
-  programIconContainer: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  programInfo: {
-    flex: 1,
-    gap: 8,
-  },
-  programTitle: {
-    fontSize: 20,
-    fontWeight: '700',
-  },
-  programMetaRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 12,
-    alignItems: 'center',
-  },
-  programMetaItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-  },
-  programSubtitle: {
-    fontSize: 12,
-    fontWeight: '500',
-  },
-  savedBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 999,
-  },
-  savedBadgeText: {
-    fontSize: 12,
-    fontWeight: '700',
-  },
-  saveAllButton: {
-    marginTop: 12,
-    marginBottom: 4,
-  },
-  sessionHeaderLeft: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: 12,
-    flex: 1,
-  },
-  sessionNumber: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  sessionNumberText: {
-    fontSize: 16,
-    fontWeight: '700',
-  },
-  sessionInfo: {
-    flex: 1,
-    gap: 4,
-  },
-  sessionFocusRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-  },
-  exercisesList: {
-    marginTop: 12,
-    marginBottom: 12,
-    gap: 8,
-  },
-  exerciseItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    paddingVertical: 6,
-  },
-  exerciseBullet: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-  },
-  exerciseContent: {
-    flex: 1,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  exerciseName: {
-    flex: 1,
-    fontSize: 14,
-    fontWeight: '600',
-    textTransform: 'capitalize',
-  },
-  exerciseMeta: {
-    fontSize: 12,
-    fontWeight: '500',
-    marginLeft: 8,
-  },
-  moreExercisesContainer: {
-    marginTop: 4,
-    paddingLeft: 18,
-  },
-  moreExercises: {
-    fontSize: 12,
-    fontWeight: '600',
-    fontStyle: 'italic',
-  },
-  startButtonSecondary: {
-    borderWidth: 1,
-  },
-  startButtonText: {
-    fontSize: 14,
-    fontWeight: '700',
   },
   headerRow: {
     flexDirection: 'row',
@@ -1004,17 +770,15 @@ const styles = StyleSheet.create({
   session: {
     marginTop: 12,
     borderWidth: 1,
-    borderRadius: 16,
-    padding: 16,
-    gap: 12,
+    borderRadius: 12,
+    padding: 12,
   },
   sessionHeader: {
-    marginBottom: 12,
+    marginBottom: 8,
   },
   sessionTitle: {
-    fontSize: 18,
+    fontSize: 16,
     fontWeight: '700',
-    marginBottom: 4,
   },
   sessionFocus: {
     fontSize: 13,

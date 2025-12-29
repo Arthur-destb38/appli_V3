@@ -7,6 +7,7 @@ import {
   ScrollView,
   StyleSheet,
   Text,
+  TouchableOpacity,
   View,
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
@@ -24,7 +25,6 @@ import {
   unfollowUser,
 } from '@/services/profileApi';
 import { AvatarPicker } from '@/components/AvatarPicker';
-import { AppButton } from '@/components/AppButton';
 
 const CURRENT_USER_ID = 'guest-user'; // TODO: récupérer depuis useAuth
 
@@ -110,11 +110,12 @@ export default function ProfileScreen() {
         <Text style={[styles.errorText, { color: theme.colors.textPrimary }]}>
           Profil introuvable
         </Text>
-        <AppButton
-          title="Retour"
+        <TouchableOpacity
+          style={[styles.backButton, { backgroundColor: theme.colors.accent }]}
           onPress={() => router.back()}
-          style={styles.backButton}
-        />
+        >
+          <Text style={styles.backButtonText}>Retour</Text>
+        </TouchableOpacity>
       </View>
     );
   }
@@ -135,9 +136,9 @@ export default function ProfileScreen() {
     >
       {/* Header */}
       <View style={styles.header}>
-        <Pressable onPress={() => router.back()} style={styles.backIcon}>
+        <TouchableOpacity onPress={() => router.back()} style={styles.backIcon}>
           <Ionicons name="arrow-back" size={24} color={theme.colors.textPrimary} />
-        </Pressable>
+        </TouchableOpacity>
         <Text style={[styles.headerTitle, { color: theme.colors.textPrimary }]}>
           {profile.username}
         </Text>
@@ -169,22 +170,22 @@ export default function ProfileScreen() {
                 Posts
               </Text>
             </View>
-            <Pressable style={styles.statItem}>
+            <TouchableOpacity style={styles.statItem}>
               <Text style={[styles.statValue, { color: theme.colors.textPrimary }]}>
                 {profile.followers_count}
               </Text>
               <Text style={[styles.statLabel, { color: theme.colors.textSecondary }]}>
                 Abonnés
               </Text>
-            </Pressable>
-            <Pressable style={styles.statItem}>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.statItem}>
               <Text style={[styles.statValue, { color: theme.colors.textPrimary }]}>
                 {profile.following_count}
               </Text>
               <Text style={[styles.statLabel, { color: theme.colors.textSecondary }]}>
                 Suivi(e)s
               </Text>
-            </Pressable>
+            </TouchableOpacity>
           </View>
         </View>
 
@@ -219,30 +220,46 @@ export default function ProfileScreen() {
         {/* Action Buttons */}
         <View style={styles.actionButtons}>
           {profile.is_own_profile ? (
-            <AppButton
-              title="Modifier le profil"
-              variant="secondary"
+            <TouchableOpacity
+              style={[styles.editButton, { backgroundColor: theme.colors.surfaceMuted }]}
               onPress={() => {/* TODO: Edit profile modal */}}
-              style={styles.editButton}
-            />
+            >
+              <Text style={[styles.editButtonText, { color: theme.colors.textPrimary }]}>
+                Modifier le profil
+              </Text>
+            </TouchableOpacity>
           ) : (
             <>
-              <AppButton
-                title={profile.is_following ? 'Abonné' : 'Suivre'}
-                variant={profile.is_following ? 'secondary' : 'primary'}
-                loading={followLoading}
+              <TouchableOpacity
+                style={[
+                  styles.followButton,
+                  {
+                    backgroundColor: profile.is_following
+                      ? theme.colors.surfaceMuted
+                      : theme.colors.accent,
+                  },
+                ]}
                 onPress={handleFollowToggle}
                 disabled={followLoading}
-                style={styles.followButton}
-              />
-              <Pressable
-                style={({ pressed }) => [
-                  styles.messageButton,
-                  { backgroundColor: theme.colors.surfaceMuted, opacity: pressed ? 0.8 : 1 },
-                ]}
+              >
+                {followLoading ? (
+                  <ActivityIndicator size="small" color={profile.is_following ? theme.colors.textPrimary : '#FFF'} />
+                ) : (
+                  <Text
+                    style={[
+                      styles.followButtonText,
+                      { color: profile.is_following ? theme.colors.textPrimary : '#FFF' },
+                    ]}
+                  >
+                    {profile.is_following ? 'Abonné' : 'Suivre'}
+                  </Text>
+                )}
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.messageButton, { backgroundColor: theme.colors.surfaceMuted }]}
               >
                 <Ionicons name="chatbubble-outline" size={18} color={theme.colors.textPrimary} />
-              </Pressable>
+              </TouchableOpacity>
             </>
           )}
         </View>
@@ -251,12 +268,12 @@ export default function ProfileScreen() {
       {/* Posts Grid */}
       <View style={[styles.postsSection, { borderColor: theme.colors.border }]}>
         <View style={styles.postsTabs}>
-          <Pressable style={[styles.postsTab, styles.postsTabActive]}>
+          <TouchableOpacity style={[styles.postsTab, styles.postsTabActive]}>
             <Ionicons name="grid" size={22} color={theme.colors.textPrimary} />
-          </Pressable>
-          <Pressable style={styles.postsTab}>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.postsTab}>
             <Ionicons name="bookmark-outline" size={22} color={theme.colors.textSecondary} />
-          </Pressable>
+          </TouchableOpacity>
         </View>
 
         {posts.length === 0 ? (
@@ -322,6 +339,12 @@ const styles = StyleSheet.create({
   },
   backButton: {
     paddingHorizontal: 24,
+    paddingVertical: 12,
+    borderRadius: 12,
+  },
+  backButtonText: {
+    color: '#FFF',
+    fontWeight: '600',
   },
   header: {
     flexDirection: 'row',
@@ -410,6 +433,14 @@ const styles = StyleSheet.create({
   },
   followButton: {
     flex: 1,
+    paddingVertical: 10,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  followButtonText: {
+    fontSize: 14,
+    fontWeight: '700',
   },
   messageButton: {
     width: 44,
@@ -420,6 +451,13 @@ const styles = StyleSheet.create({
   },
   editButton: {
     flex: 1,
+    paddingVertical: 10,
+    borderRadius: 10,
+    alignItems: 'center',
+  },
+  editButtonText: {
+    fontSize: 14,
+    fontWeight: '600',
   },
   postsSection: {
     marginTop: 20,

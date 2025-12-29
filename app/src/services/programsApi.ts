@@ -93,21 +93,3 @@ export const generateProgram = async (payload: GenerateProgramPayload): Promise<
 
   return (await response.json()) as Program;
 };
-
-/**
- * Sauvegarde un programme et crée les séances associées
- */
-export const saveProgram = async (programId: string): Promise<{ program_id: string; workouts_created: number; workouts: Array<{ id: string; title: string; day_index: number }> }> => {
-  const headers = await getAuthHeaders();
-  const response = await fetch(`${PROGRAMS_BASE}/${programId}/save`, {
-    method: 'POST',
-    headers,
-  });
-
-  if (!response.ok) {
-    const message = await response.text();
-    throw new Error(message || 'Impossible d\'enregistrer le programme');
-  }
-
-  return (await response.json()) as { program_id: string; workouts_created: number; workouts: Array<{ id: string; title: string; day_index: number }> };
-};

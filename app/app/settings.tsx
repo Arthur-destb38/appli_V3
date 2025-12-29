@@ -7,7 +7,7 @@ import {
   Switch,
   Text,
   TextInput,
-  Pressable,
+  TouchableOpacity,
   View,
 } from 'react-native';
 
@@ -134,15 +134,9 @@ const SettingsScreen: React.FC = () => {
               <Text style={[styles.label, { color: theme.colors.textPrimary }]}>Pseudo</Text>
               <Text style={[styles.value, { color: theme.colors.textSecondary }]}>{profile?.username}</Text>
             </View>
-            <Pressable
-              style={({ pressed }) => [
-                styles.iconButton,
-                { opacity: pressed ? 0.6 : 1 },
-              ]}
-              onPress={openUsernameModal}
-            >
+            <TouchableOpacity style={styles.iconButton} onPress={openUsernameModal}>
               <Text style={[styles.iconLabel, { color: theme.colors.textSecondary }]}>✏️</Text>
-            </Pressable>
+            </TouchableOpacity>
           </View>
           <View style={styles.row}>
             <View style={{ flex: 1 }}>
@@ -170,15 +164,9 @@ const SettingsScreen: React.FC = () => {
                 Comprends comment tes données sont utilisées et partagées.
               </Text>
             </View>
-            <Pressable
-              style={({ pressed }) => [
-                styles.iconButton,
-                { opacity: pressed ? 0.6 : 1 },
-              ]}
-              onPress={openPrivacyPolicy}
-            >
+            <TouchableOpacity style={styles.iconButton} onPress={openPrivacyPolicy}>
               <Text style={[styles.iconLabel, { color: theme.colors.textSecondary }]}>🔗</Text>
-            </Pressable>
+            </TouchableOpacity>
           </View>
         </AppCard>
 
@@ -218,12 +206,14 @@ const SettingsScreen: React.FC = () => {
           </View>
           {notificationsOn ? (
             <View style={styles.timeRow}>
-              <AppButton
-                title="Modifier l'heure"
-                variant="ghost"
-                onPress={() => setIsPickingTime(true)}
+              <TouchableOpacity
                 style={[styles.timeButton, { borderColor: theme.colors.border }]}
-              />
+                onPress={() => setIsPickingTime(true)}
+              >
+                <Text style={[styles.timeButtonText, { color: theme.colors.textPrimary }]}>
+                  Modifier l'heure
+                </Text>
+              </TouchableOpacity>
               <Text style={[styles.timeValue, { color: theme.colors.textSecondary }]}>
                 {toTimeLabel(notificationTime)}
               </Text>
@@ -253,18 +243,12 @@ const SettingsScreen: React.FC = () => {
 
         <AppCard>
           <Text style={[styles.sectionTitle, { color: theme.colors.textSecondary }]}>Légal</Text>
-        <Pressable
-          onPress={() => router.push('/legal/terms')}
-          style={({ pressed }) => ({ opacity: pressed ? 0.6 : 1 })}
-        >
+        <TouchableOpacity onPress={() => router.push('/legal/terms')}>
           <Text style={[styles.link, { color: theme.colors.accent }]}>Conditions générales d'utilisation</Text>
-        </Pressable>
-        <Pressable
-          onPress={() => router.push('/legal/privacy')}
-          style={({ pressed }) => ({ opacity: pressed ? 0.6 : 1 })}
-        >
+        </TouchableOpacity>
+        <TouchableOpacity onPress={() => router.push('/legal/privacy')}>
           <Text style={[styles.link, { color: theme.colors.accent }]}>Politique de confidentialité</Text>
-        </Pressable>
+        </TouchableOpacity>
       </AppCard>
       </ScrollView>
 
@@ -328,53 +312,29 @@ const SettingsScreen: React.FC = () => {
               <View style={styles.timeColumn}>
                 <Text style={[styles.timeColumnLabel, { color: theme.colors.textSecondary }]}>Heures</Text>
                 <View style={[styles.stepper, { borderColor: theme.colors.border }]}>
-                  <Pressable
-                    style={({ pressed }) => [
-                      styles.stepperButton,
-                      { backgroundColor: theme.colors.surfaceMuted, opacity: pressed ? 0.6 : 1 },
-                    ]}
-                    onPress={() => incrementHours(-1)}
-                  >
+                  <TouchableOpacity style={[styles.stepperButton, { backgroundColor: theme.colors.surfaceMuted }]} onPress={() => incrementHours(-1)}>
                     <Text style={[styles.stepperLabel, { color: theme.colors.textPrimary }]}>-</Text>
-                  </Pressable>
+                  </TouchableOpacity>
                   <Text style={[styles.timeValueLarge, { color: theme.colors.textPrimary }]}>
                     {notificationTime.getHours().toString().padStart(2, '0')}
                   </Text>
-                  <Pressable
-                    style={({ pressed }) => [
-                      styles.stepperButton,
-                      { backgroundColor: theme.colors.surfaceMuted, opacity: pressed ? 0.6 : 1 },
-                    ]}
-                    onPress={() => incrementHours(1)}
-                  >
+                  <TouchableOpacity style={[styles.stepperButton, { backgroundColor: theme.colors.surfaceMuted }]} onPress={() => incrementHours(1)}>
                     <Text style={[styles.stepperLabel, { color: theme.colors.textPrimary }]}>+</Text>
-                  </Pressable>
+                  </TouchableOpacity>
                 </View>
               </View>
               <View style={styles.timeColumn}>
                 <Text style={[styles.timeColumnLabel, { color: theme.colors.textSecondary }]}>Minutes</Text>
                 <View style={[styles.stepper, { borderColor: theme.colors.border }]}>
-                  <Pressable
-                    style={({ pressed }) => [
-                      styles.stepperButton,
-                      { backgroundColor: theme.colors.surfaceMuted, opacity: pressed ? 0.6 : 1 },
-                    ]}
-                    onPress={() => incrementMinutes(-5)}
-                  >
+                  <TouchableOpacity style={[styles.stepperButton, { backgroundColor: theme.colors.surfaceMuted }]} onPress={() => incrementMinutes(-5)}>
                     <Text style={[styles.stepperLabel, { color: theme.colors.textPrimary }]}>-</Text>
-                  </Pressable>
+                  </TouchableOpacity>
                   <Text style={[styles.timeValueLarge, { color: theme.colors.textPrimary }]}>
                     {notificationTime.getMinutes().toString().padStart(2, '0')}
                   </Text>
-                  <Pressable
-                    style={({ pressed }) => [
-                      styles.stepperButton,
-                      { backgroundColor: theme.colors.surfaceMuted, opacity: pressed ? 0.6 : 1 },
-                    ]}
-                    onPress={() => incrementMinutes(5)}
-                  >
+                  <TouchableOpacity style={[styles.stepperButton, { backgroundColor: theme.colors.surfaceMuted }]} onPress={() => incrementMinutes(5)}>
                     <Text style={[styles.stepperLabel, { color: theme.colors.textPrimary }]}>+</Text>
-                  </Pressable>
+                  </TouchableOpacity>
                 </View>
               </View>
             </View>
@@ -482,6 +442,12 @@ const styles = StyleSheet.create({
   timeButton: {
     paddingVertical: 10,
     paddingHorizontal: 16,
+    borderRadius: 12,
+    borderWidth: 1,
+  },
+  timeButtonText: {
+    fontSize: 15,
+    fontWeight: '600',
   },
   timeValue: {
     fontSize: 16,

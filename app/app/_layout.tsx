@@ -77,6 +77,14 @@ export default function RootLayout() {
                   options={{ title: 'Défi', headerShown: false }}
                 />
                 <Stack.Screen
+                  name="workouts/created"
+                  options={{ title: 'Mes séances créées', headerShown: false }}
+                />
+                <Stack.Screen
+                  name="workouts/completed"
+                  options={{ title: 'Mes séances passées', headerShown: false }}
+                />
+                <Stack.Screen
                   name="modal"
                   options={{ presentation: 'modal', title: 'Modal' }}
                 />
